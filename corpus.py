@@ -28,7 +28,10 @@ class FSM:
 
     def get_analyses(self, word):
         if len(word) > 3 and wRE.match(word):
-            return set(self.fsm.apply_up(strip_accents(word)))
+            analyses = set(self.fsm.apply_up(strip_accents(word)))
+            if not analyses:
+                analyses = {word}
+            return analyses
         return None
 
 class Vocabulary:
@@ -65,23 +68,19 @@ class Analysis:
     def __len__(self):
         return len(self.morphemes)-1
 
-def analyze_corpus(fsm, text):
+def analyze_corpus(fsm, stream):
     vocabulary = {'morpheme': Vocabulary(), 'stem': Vocabulary()}
     assert (vocabulary['morpheme']['stem'] == STEM)
     corpus = []
     sys.stderr.write('Reading corpus ')
-    with open(text) as fp:
-        for i, sentence in enumerate(fp):
-            if i % 1000 == 0:
-                sys.stderr.write('*')
-                sys.stderr.flush()
-            if i % 100 == 0:
-                sys.stderr.write('.')
-                sys.stderr.flush()
-            for word in sentence.decode('utf8').split():
-                analyses = fsm.get_analyses(word)
-                if not analyses: continue # TODO: [Analysis(word, vocabulary)]
-                analyses = [Analysis(analysis, vocabulary) for analysis in analyses]
-                corpus.append(analyses)
+    for i, sentence in enumerate(stream):
+        if i % 1000 == 0:
+            sys.stderr.write('*')
+            sys.stderr.flush()
+        for word in sentence.decode('utf8').split():
+            analyses = fsm.get_analyses(word)
+            if not analyses: continue
+            analyses = [Analysis(analysis, vocabulary) for analysis in analyses]
+            corpus.append(analyses)
     sys.stderr.write(' done\n')
     return corpus, vocabulary

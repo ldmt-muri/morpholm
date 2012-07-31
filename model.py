@@ -13,7 +13,7 @@ def smooth(model): # add-1 smoothing
 LOG10 = np.log(10)
 
 class Model:
-    def char_prob(self, stem):
+    def char_lm_prob(self, stem):
         # KenLM score is logarithm in base 10
         chars = ' '.join(self.vocabulary['stem'][stem])
         return self.char_lm.score(chars)*LOG10
@@ -25,14 +25,13 @@ class Model:
             loglik = 0
             # Expectation
             for analyses in corpus:
-                stem_probs, char_probs = zip(*map(self.stem_char_prob, analyses))
-                probs = marginalize((stem_probs, char_probs)) # p(char)+p(stem)
+                probs = map(self.stem_prob, analyses)
+                #probs = marginalize((stem_probs, char_probs)) # p(char)+p(stem)
                 norm = marginalize(probs)
                 loglik += norm
-                for analysis, lp_stem, lp_char, lp in\
-                        izip(analyses, stem_probs, char_probs, probs):
-                    self.count(analysis, lp_stem-norm, lp_char-norm, lp-norm)
-                self.count_words += 1
+                for analysis, lp in izip(analyses, probs):
+                    self.count(analysis, lp-norm)
+                #self.count_words += 1
             print(' Log likelihood: {0}\n'.format(loglik))
             # Maximization
             self.maximization()

@@ -1,5 +1,4 @@
 import cPickle
-import kenlm
 from model1 import Model1
 
 if __name__ == '__main__':
@@ -13,9 +12,10 @@ if __name__ == '__main__':
         n_stems = int(next(fp))
     model = Model1()
     model.vocabulary = vocabulary
-    model.char_lm = kenlm.LanguageModel('charlm.klm')
+    #model.char_lm = kenlm.LanguageModel('charlm.klm')
     model.uniform_init(n_morphemes, n_stems)
     model.run_em(Niter, corpus)
-    del model.char_lm
+    del model.vocabulary
+    #del model.char_lm
     with open('model1.pickle', 'w') as fp:
         cPickle.dump(model, fp, protocol=2)
