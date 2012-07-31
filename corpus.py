@@ -28,25 +28,26 @@ class FSM:
 
     def get_analyses(self, word):
         if len(word) > 3 and wRE.match(word):
-            return list(self.fsm.apply_up(strip_accents(word)))
+            return set(self.fsm.apply_up(strip_accents(word)))
         return None
 
 class Vocabulary:
     def __init__(self):
-        self.words = {}
+        self.word2id = {}
+        self.id2word = []
         self.frozen = False
 
     def __getitem__(self, word):
-        if word not in self.words:
+        if isinstance(word, int):
+            return self.id2word[word]
+        if word not in self.word2id:
             if self.frozen: return OOV
-            self.words[word] = len(self.words)
-        return self.words[word]
+            self.word2id[word] = len(self)
+            self.id2word.append(word)
+        return self.word2id[word]
 
     def __len__(self):
-        return len(self.words)
-
-    def __iter__(self):
-        return iter(self.words)
+        return len(self.id2word)
 
 class Analysis:
     def __init__(self, analysis, vocabulary):
@@ -59,7 +60,6 @@ class Analysis:
                 self.morphemes.append(vocabulary['morpheme'][morph])
             else:
                 self.stem = vocabulary['stem'][morph]
-                self.stem_str = morph
                 self.morphemes.append(STEM)
 
     def __len__(self):
@@ -80,7 +80,7 @@ def analyze_corpus(fsm, text):
                 sys.stderr.flush()
             for word in sentence.decode('utf8').split():
                 analyses = fsm.get_analyses(word)
-                if not analyses: continue
+                if not analyses: continue # TODO: [Analysis(word, vocabulary)]
                 analyses = [Analysis(analysis, vocabulary) for analysis in analyses]
                 corpus.append(analyses)
     sys.stderr.write(' done\n')
