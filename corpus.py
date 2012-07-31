@@ -1,4 +1,3 @@
-from itertools import izip
 import unicodedata
 import sys
 import re
@@ -20,10 +19,17 @@ MORPH = {'aPss', 'tafaPss', 'voaPss',
          'OvertGenAgent', 'ActiveVoice'}
         #'Guess', 'Inch', 'Adj', 'Punct', 'GEN', 'Redup', 'Noun',  'Root'
 
-should_analyze = lambda word: len(word) > 3 and wRE.match(word)
+STEM = 0
+OOV = -1
 
-class OOV(Exception):
-    pass
+class FSM:
+    def __init__(self, fsm):
+        self.fsm = foma.read_binary(fsm)
+
+    def get_analyses(self, word):
+        if len(word) > 3 and wRE.match(word):
+            return list(self.fsm.apply_up(strip_accents(word)))
+        return None
 
 class Vocabulary:
     def __init__(self):
@@ -32,7 +38,7 @@ class Vocabulary:
 
     def __getitem__(self, word):
         if word not in self.words:
-            if self.frozen: raise OOV(word)
+            if self.frozen: return OOV
             self.words[word] = len(self.words)
         return self.words[word]
 
@@ -46,60 +52,36 @@ class Analysis:
     def __init__(self, analysis, vocabulary):
         """ Split the morphemes from the output of the analyzer """
         morphs = analysis.split('+')
-        morphs = [morph for morph in morphs if morph]
+        morphs = (morph for morph in morphs if morph)
         self.morphemes = []
         for morph in morphs:
             if morph in MORPH:
                 self.morphemes.append(vocabulary['morpheme'][morph])
             else:
-                self.lemma = vocabulary['lemma'][morph]
+                self.stem = vocabulary['stem'][morph]
+                self.stem_str = morph
+                self.morphemes.append(STEM)
 
     def __len__(self):
-        return len(self.morphemes)
+        return len(self.morphemes)-1
 
-class Corpus:
-    def __init__(self, fsm, corpus):
-        fsm = foma.read_binary(fsm)
-        self.vocabulary = {'morpheme': Vocabulary(), 'lemma': Vocabulary()}
-        self.corpus = []
-        sys.stdout.write('Reading corpus ')
-        with open(corpus) as fp:
-            for i, sentence in enumerate(fp):
-                if i % 1000 == 0:
-                    sys.stdout.write('.')
-                    sys.stdout.flush()
-                for word in sentence.decode('utf8').split():
-                    if should_analyze(word):
-                        analyses = list(fsm.apply_up(strip_accents(word)))
-                        if analyses:
-                            self.corpus.append(map(self.make_analysis, analyses))
-        self.n_morphemes = len(self.vocabulary['morpheme'])
-        self.n_lemmas = len(self.vocabulary['lemma'])
-        print(' found {0} lemmas'.format(self.n_lemmas))
-
-    def make_analysis(self, analysis):
-        return Analysis(analysis, self.vocabulary)
-
-    def __iter__(self):
-        return iter(self.corpus)
-
-class Decoder:
-    def __init__(self, fsm, model, vocabulary):
-        self.fsm = foma.read_binary(fsm)
-        self.model = model
-        self.vocabulary = vocabulary
-        vocabulary['morpheme'].frozen = True
-        vocabulary['lemma'].frozen = True
-
-    def make_analysis(self, analysis):
-        return Analysis(analysis, self.vocabulary)
-
-    def decode(self, word):
-        if not should_analyze(word): return word
-        analyses = list(self.fsm.apply_up(strip_accents(word)))
-        if not analyses: return word
-        try:
-            probs = map(self.model.prob, map(self.make_analysis, analyses))
-            return max(izip(probs, analyses))[1]
-        except OOV:
-            return word
+def analyze_corpus(fsm, text):
+    vocabulary = {'morpheme': Vocabulary(), 'stem': Vocabulary()}
+    assert (vocabulary['morpheme']['stem'] == STEM)
+    corpus = []
+    sys.stderr.write('Reading corpus ')
+    with open(text) as fp:
+        for i, sentence in enumerate(fp):
+            if i % 1000 == 0:
+                sys.stderr.write('*')
+                sys.stderr.flush()
+            if i % 100 == 0:
+                sys.stderr.write('.')
+                sys.stderr.flush()
+            for word in sentence.decode('utf8').split():
+                analyses = fsm.get_analyses(word)
+                if not analyses: continue
+                analyses = [Analysis(analysis, vocabulary) for analysis in analyses]
+                corpus.append(analyses)
+    sys.stderr.write(' done\n')
+    return corpus, vocabulary
