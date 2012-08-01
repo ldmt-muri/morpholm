@@ -32,7 +32,7 @@ class Model:
                 for analysis, lp in izip(analyses, probs):
                     self.count(analysis, lp-norm)
                 #self.count_words += 1
-            print(' Log likelihood: {0}\n'.format(loglik))
+            print(' Log likelihood: {0}'.format(loglik))
             # Maximization
             self.maximization()
         self.cleanup()

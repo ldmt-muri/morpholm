@@ -4,17 +4,17 @@ import numpy as np
 import kenlm
 from corpus import Analysis, FSM
 
-if __name__ == '__main__':
-    with open('vocab.pickle') as fp:
+def main(vocab_file, model_file, charlm, fst):
+    with open(vocab_file) as fp:
         vocabulary = cPickle.load(fp)
-    with open('model1.pickle') as fp:
+    with open(model_file) as fp:
         model = cPickle.load(fp)
     model.vocabulary = vocabulary
-    model.char_lm = kenlm.LanguageModel('charlm.klm')
+    model.char_lm = kenlm.LanguageModel(charlm)
     model.model_char = 0.5 # Instead of 0
     vocabulary['morpheme'].frozen = True
     vocabulary['stem'].frozen = True
-    fsm = FSM('malmorph.fst')
+    fsm = FSM(fst)
 
     print('Analyzing corpus...')
     corpus_probs = []
@@ -47,5 +47,11 @@ if __name__ == '__main__':
     print('Updating model...')
     del model.char_lm
     del model.vocabulary
-    with open('model1.pickle', 'w') as fp:
+    with open(model_file, 'w') as fp:
         cPickle.dump(model, fp, protocol=2)
+
+if __name__ == '__main__':
+    if len(sys.argv) != 5:
+        sys.stderr.write('Usage: {argv[0]} vocab model charlm fst\n'.format(argv=sys.argv))
+        sys.exit(1)
+    main(*sys.argv[1:])

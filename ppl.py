@@ -9,17 +9,17 @@ class CharLM:
     def prob(self, word):
         return self.char_lm.score(' '.join(word))*LOG10
 
-if __name__ == '__main__':
-    with open('vocab.pickle') as fp:
+def main(vocab_file, model_file, charlm, fst):
+    with open(vocab_file) as fp:
         vocabulary = cPickle.load(fp)
-    with open('model1.pickle') as fp:
+    with open(model_file) as fp:
         model = cPickle.load(fp)
     #model = CharLM()
     model.vocabulary = vocabulary
-    model.char_lm = kenlm.LanguageModel('charlm.klm')
+    model.char_lm = kenlm.LanguageModel(charlm)
     vocabulary['morpheme'].frozen = True
     vocabulary['stem'].frozen = True
-    fsm = FSM('malmorph.fst')
+    fsm = FSM(fst)
 
     total_prob = 0
     n_words = 0
@@ -41,3 +41,9 @@ if __name__ == '__main__':
     print('Log Likelihood: {0:.3f}'.format(total_prob))
     print('       # words: {0}'.format(n_words))
     print('    Perplexity: {0:.3f}'.format(ppl))
+
+if __name__ == '__main__':
+    if len(sys.argv) != 5:
+        sys.stderr.write('Usage: {argv[0]} vocab model charlm fst\n'.format(argv=sys.argv))
+        sys.exit(1)
+    main(*sys.argv[1:])
