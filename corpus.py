@@ -20,7 +20,6 @@ MORPH = {'aPss', 'tafaPss', 'voaPss',
         #'Guess', 'Inch', 'Adj', 'Punct', 'GEN', 'Redup', 'Noun',  'Root'
 
 STEM = 0
-OOV = -1
 
 class FSM:
     def __init__(self, fsm):
@@ -34,6 +33,8 @@ class FSM:
             return analyses
         return None
 
+class OOV(Exception): pass
+
 class Vocabulary:
     def __init__(self):
         self.word2id = {}
@@ -42,9 +43,10 @@ class Vocabulary:
 
     def __getitem__(self, word):
         if isinstance(word, int):
+            assert word >= 0
             return self.id2word[word]
         if word not in self.word2id:
-            if self.frozen: return OOV
+            if self.frozen: raise OOV(word)
             self.word2id[word] = len(self)
             self.id2word.append(word)
         return self.word2id[word]
@@ -57,13 +59,38 @@ class Analysis:
         """ Split the morphemes from the output of the analyzer """
         morphs = analysis.split('+')
         morphs = (morph for morph in morphs if morph)
+        self.oov = False
         self.morphemes = []
         for morph in morphs:
             if morph in MORPH:
                 self.morphemes.append(vocabulary['morpheme'][morph])
             else:
-                self.stem = vocabulary['stem'][morph]
+                try:
+                    self.stem = vocabulary['stem'][morph]
+                except OOV:
+                    self.stem = morph
+                    self.oov = True
                 self.morphemes.append(STEM)
+
+    def split(self):
+        if not hasattr(self, '_right'):
+            stem_index = self.morphemes.index(STEM)
+            self._left = self.morphemes[stem_index-1::-1] # self.morphemes[:stem_index]
+            self._right = self.morphemes[stem_index+1:]
+
+    def decode_stem(self, vocabulary):
+        if self.oov: return self.stem
+        return vocabulary[self.stem]
+
+    @property
+    def right_morphemes(self):
+        self.split()
+        return self._right
+
+    @property
+    def left_morphemes(self):
+        self.split()
+        return self._left
 
     def __len__(self):
         return len(self.morphemes)-1

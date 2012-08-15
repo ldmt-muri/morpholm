@@ -1,7 +1,8 @@
 import sys
 import cPickle
-#from model1 import Model1
-from model2 import Model2
+#from model1 import Model1 as Model
+from model2 import Model2 as Model
+#from model22 import Model22 as Model
 
 def main(vocab_file, corpus_file, out):
     Niter = 10
@@ -11,13 +12,14 @@ def main(vocab_file, corpus_file, out):
     n_stems = len(vocabulary['stem'])
     with open(corpus_file) as fp:
         corpus = cPickle.load(fp)
-    model = Model2()
-    model.vocabulary = vocabulary
-    #model.char_lm = kenlm.LanguageModel('charlm.klm')
+    ### Upgrade OOV stuff
+    for word in corpus:
+        for analysis in word:
+            analysis.oov = False
+    ### End upgrade OOV stuff
+    model = Model()
     model.uniform_init(n_morphemes, n_stems)
     model.run_em(Niter, corpus)
-    del model.vocabulary
-    #del model.char_lm
     with open(out, 'w') as fp:
         cPickle.dump(model, fp, protocol=2)
 

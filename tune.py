@@ -2,7 +2,7 @@ import sys
 import cPickle
 import numpy as np
 import kenlm
-from corpus import Analysis, FSM
+from corpus import Analysis, FSM, OOV
 
 def main(vocab_file, model_file, charlm, fst):
     with open(vocab_file) as fp:
@@ -25,7 +25,11 @@ def main(vocab_file, model_file, charlm, fst):
             if not analyses: continue
             # keep small words as-is (i.e. use char LM)
             #    analyses = [Analysis(word, vocabulary, small=True)]
-            analyses = [Analysis(analysis, vocabulary) for analysis in analyses]
+            try:
+                analyses = [Analysis(analysis, vocabulary) for analysis in analyses]
+            except OOV, oov:
+                print('Ignored analysis with OOV morpheme: {0}'.format(oov))
+                continue
             stem_probs = map(model.stem_prob, analyses)
             char_probs = map(model.char_prob, analyses)
             sp = np.logaddexp.reduce(stem_probs)
