@@ -1,7 +1,7 @@
 import sys
 import cPickle
-#from model1 import Model1 as Model
-from model2 import Model2 as Model
+from model1 import Model1 as Model
+#from model2 import Model2 as Model
 #from model22 import Model22 as Model
 
 def main(vocab_file, corpus_file, out):
@@ -18,8 +18,10 @@ def main(vocab_file, corpus_file, out):
             analysis.oov = False
     ### End upgrade OOV stuff
     model = Model()
-    model.uniform_init(n_morphemes, n_stems)
-    model.run_em(Niter, corpus)
+    #model.uniform_init(n_morphemes, n_stems)
+    #model.run_em(Niter, corpus)
+    model.init_sampler(n_morphemes, n_stems, 1, 1, 1, 1)
+    model.run_sampler(Niter, corpus)
     with open(out, 'w') as fp:
         cPickle.dump(model, fp, protocol=2)
 

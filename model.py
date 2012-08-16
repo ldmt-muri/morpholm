@@ -62,3 +62,25 @@ class Model:
             self.maximization()
         self.cleanup()
         return loglik
+
+    def run_sampler(self, n_iterations, corpus):
+        assignments = np.zeros(len(corpus), int)
+        for it in range(n_iterations):
+            print('Iteration {0}:'.format(it+1))
+            for i, analyses in enumerate(corpus):
+                if it > 0: self.increment(analyses[assignments[i]], -1)
+                assignments[i] = self.sample(analyses)
+                self.increment(analyses[assignments[i]], 1)
+            self.map_estimate()
+            loglik = sum(marginalize(map(self.stem_prob, analyses)) for analyses in corpus)
+            print(' Log likelihood: {0}'.format(loglik))
+        self.cleanup()
+
+    def sample(self, analyses):
+        if len(analyses) == 1: return 0
+        weights = map(self.pred_weight, analyses)
+        v = np.random.rand()*sum(weights)
+        for z, w in enumerate(weights):
+            if w > v:
+                return z
+            v -= w
