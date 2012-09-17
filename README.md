@@ -9,23 +9,25 @@
 
 ## Combined training + evaluation
 
+To run Unigram Model 2 (~1h & 8G on the Global Voices data):
+
     python full.py --train training-corpus.txt --dev dev-corpus.txt --test test-corpus.txt\
-        --fst analyzer.fst --charlm charlm.klm
+        --fst analyzer.fst --charlm charlm.klm --model 2
 
 ## Training a model step by step
 
 - Analyze the training corpus:
 
-    python analyze_corpus.py analyzer.fst vocab.pickle corpus.pickle < training-corpus.txt
+        python analyze_corpus.py analyzer.fst vocab.pickle corpus.pickle < training-corpus.txt
 
 - Train a model:
 
-    python em.py vocab.pickle corpus.pickle model1.pickle
+        python em.py vocab.pickle corpus.pickle model1.pickle
 
 - Tune the CharLM/MorphLM interpolation parameter:
 
-    python tune.py vocab.pickle model1.pickle charlm.klm analyzer.fst < dev-corpus.txt
+        python tune.py vocab.pickle model1.pickle charlm.klm analyzer.fst < dev-corpus.txt
 
 - Evaluate by computing the test set perplexity:
 
-    python ppl.py vocab.pickle model1.pickle charlm.klm analyzer.fst < test-corpus.txt
+        python ppl.py vocab.pickle model1.pickle charlm.klm analyzer.fst < test-corpus.txt
