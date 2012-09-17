@@ -7,33 +7,25 @@ strip_accents = lambda s: ''.join(c for c in unicodedata.normalize('NFD', s)
         if unicodedata.category(c) != 'Mn')
 
 wRE = re.compile('^[a-z]+$')
-MORPH = {'aPss', 'tafaPss', 'voaPss', 
-         'PastTense', 'NonpastTense', 'PresentTense', 'PresentActive', 'FutureTense',
-         'NominalizationMP', 'NominalizationF', 'NominalizationHA',
-         'Ma', 'ActiveI', 'ActiveAN', 'ANACaus', 'AhaCaus', 'AhaAbil',
-         'AmpCaus', 'AnkCaus', 'Recip',
-         'Directive', 'Locative',  'NounRoot', 'AdjRoot', 'PassRoot', 'NonPassRoot', 
-         'Verb', 'Oblique', 'Deictic',
-         'Passive1','Passive2', 'VerbPassive2', 'PassImp', 'ActImp', 'Imp',
-         '1SgGen', '2SgGen', '3Gen', '1PlIncGen', '1PlExcGen', '2PlGen',
-         'OvertGenAgent', 'ActiveVoice'}
-        #'Guess', 'Inch', 'Adj', 'Punct', 'GEN', 'Redup', 'Noun',  'Root'
-
+morphRE = re.compile('[A-Z]')
 STEM = 0
+
+class OOV(Exception): pass
+class AnalysisError(Exception): pass
 
 class FSM:
     def __init__(self, fsm):
         self.fsm = foma.read_binary(fsm)
 
     def get_analyses(self, word):
+        if '+' in word:
+            word = word.replace('+', '#')
+        word = strip_accents(word)
         if len(word) > 3 and wRE.match(word):
-            analyses = set(self.fsm.apply_up(strip_accents(word)))
-            if not analyses:
-                analyses = {word}
+            analyses = set(self.fsm.apply_up(word))
+            if not analyses: return {word}
             return analyses
-        return None
-
-class OOV(Exception): pass
+        return {word}
 
 class Vocabulary:
     def __init__(self):
@@ -54,23 +46,32 @@ class Vocabulary:
     def __len__(self):
         return len(self.id2word)
 
+analysis_fix = re.compile('A\+(\d)')
+
+# TODO: cache to reduce memory usage
 class Analysis:
     def __init__(self, analysis, vocabulary):
         """ Split the morphemes from the output of the analyzer """
+        analysis = analysis_fix.sub(r'a+\1', analysis) # ??????????????
         morphs = analysis.split('+')
         morphs = (morph for morph in morphs if morph)
         self.oov = False
         self.morphemes = []
+        self.stem = None
         for morph in morphs:
-            if morph in MORPH:
+            if morphRE.search(morph): # non-stem
                 self.morphemes.append(vocabulary['morpheme'][morph])
-            else:
+            else: # stem
                 try:
+                    if self.stem is not None:
+                        raise AnalysisError(analysis)
                     self.stem = vocabulary['stem'][morph]
                 except OOV:
-                    self.stem = morph
+                    self.stem = morph # do not encode
                     self.oov = True
                 self.morphemes.append(STEM)
+        if self.stem is None:
+            raise AnalysisError(analysis)
 
     def split(self):
         if not hasattr(self, '_right'):
@@ -93,21 +94,34 @@ class Analysis:
         return self._left
 
     def __len__(self):
-        return len(self.morphemes)-1
+        return len(self.morphemes) - 1
+
+class Corpus:
+    def __init__(self):
+        self.sentences = []
+
+    def __iter__(self):
+        for sentence in self.sentences:
+            for word in sentence:
+                yield word
 
 def analyze_corpus(fsm, stream):
     vocabulary = {'morpheme': Vocabulary(), 'stem': Vocabulary()}
     assert (vocabulary['morpheme']['stem'] == STEM)
-    corpus = []
+    corpus = Corpus()
     sys.stderr.write('Reading corpus ')
     for i, sentence in enumerate(stream):
         if i % 1000 == 0:
-            sys.stderr.write('*')
+            sys.stderr.write('.')
             sys.stderr.flush()
+        analyzed_sentence = []
         for word in sentence.decode('utf8').split():
             analyses = fsm.get_analyses(word)
-            if not analyses: continue
-            analyses = [Analysis(analysis, vocabulary) for analysis in analyses]
-            corpus.append(analyses)
+            try:
+                analyses = [Analysis(analysis, vocabulary) for analysis in analyses]
+                analyzed_sentence.append(analyses)
+            except AnalysisError as analysis:
+                print('Analyzis error for {0}: {1}'.format(word, analysis))
+        corpus.sentences.append(analyzed_sentence)
     sys.stderr.write(' done\n')
     return corpus, vocabulary

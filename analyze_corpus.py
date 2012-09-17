@@ -3,8 +3,8 @@ import cPickle
 from corpus import FSM, analyze_corpus
 
 def main(fst, vocab_out, corpus_out):
-    fst = FSM(fst)
-    corpus, vocabulary = analyze_corpus(fst, sys.stdin)
+    fsm = FSM(fst)
+    corpus, vocabulary = analyze_corpus(fsm, sys.stdin)
     print('Found {0} morphemes'.format(len(vocabulary['morpheme'])))
     print('Found {0} stems'.format(len(vocabulary['stem'])))
     sys.stderr.write('Saving vocabulary...\n')

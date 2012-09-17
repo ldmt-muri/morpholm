@@ -1,4 +1,5 @@
 from itertools import izip
+import math
 import numpy as np
 
 marginalize = np.logaddexp.reduce
@@ -10,7 +11,7 @@ def normalize(model):
 def smooth(model): # add-1 smoothing
     return marginalize((model, np.zeros(len(model))))
 
-LOG10 = np.log(10)
+LOG10 = math.log(10)
 
 class Model:
     def char_lm_prob(self, analysis):
@@ -30,16 +31,16 @@ class Model:
 
     # log(p(analysis)),
     def prob(self, analysis):
-        sp = self.stem_prob(analysis) + np.log(1-self.model_char)
-        cp = self.char_prob(analysis) + np.log(self.model_char)
+        sp = self.stem_prob(analysis) + math.log(1-self.model_char)
+        cp = self.char_prob(analysis) + math.log(self.model_char)
         if sp == cp == -np.inf: return -np.inf
         return np.logaddexp(sp, cp)
 
     # log(p_morph), log(p_stem)
     def probs(self, analysis):
         sp = (-np.inf if analysis.oov else
-                self.model_stems[analysis.stem] + np.log(1-self.model_char))
-        cp = self.char_lm_prob(analysis) + np.log(self.model_char)
+                self.model_stems[analysis.stem] + math.log(1-self.model_char))
+        cp = self.char_lm_prob(analysis) + math.log(self.model_char)
         p_stem = np.logaddexp(sp, cp)
         return (self.common_prob(analysis), p_stem)
 

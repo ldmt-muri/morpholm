@@ -1,4 +1,5 @@
 from itertools import izip, tee
+import math
 import numpy as np
 from model import Model, normalize, smooth
 
@@ -26,11 +27,12 @@ def square_noise(n):
 class Model2(Model):
     def uniform_init(self, n_morphemes, n_stems):
         # Morphemes
-        self.model_morphemes = np.zeros((n_morphemes+1, n_morphemes+1)) - np.log((n_morphemes+1))
+        self.model_morphemes = (np.zeros((n_morphemes+1, n_morphemes+1)) 
+                - math.log((n_morphemes+1)))
         self.model_morphemes += square_noise(n_morphemes+1)
         self.model_morphemes = row_normalize(self.model_morphemes)
         # Stems
-        self.model_stems = np.zeros(n_stems) - np.log(n_stems)
+        self.model_stems = np.zeros(n_stems) - math.log(n_stems)
         self.model_stems += np.random.randn(n_stems)
         self.model_stems = normalize(self.model_stems)
         # Character model or stem model?

@@ -1,18 +1,19 @@
 import numpy as np
+import math
 from model import Model, normalize, smooth
 from model2 import square_noise, row_normalize, bigrams
 
 class Model22(Model):
     def uniform_init(self, n_morphemes, n_stems):
         # Morphemes
-        self.model_left = np.zeros((n_morphemes+1, n_morphemes+1)) - np.log((n_morphemes+1))
+        self.model_left = np.zeros((n_morphemes+1, n_morphemes+1)) - math.log((n_morphemes+1))
         self.model_left += square_noise(n_morphemes+1)
         self.model_left = row_normalize(self.model_left)
-        self.model_right = np.zeros((n_morphemes+1, n_morphemes+1)) - np.log((n_morphemes+1))
+        self.model_right = np.zeros((n_morphemes+1, n_morphemes+1)) - math.log((n_morphemes+1))
         self.model_right += square_noise(n_morphemes+1)
         self.model_right = row_normalize(self.model_right)
         # Stems
-        self.model_stems = np.zeros(n_stems) - np.log(n_stems)
+        self.model_stems = np.zeros(n_stems) - math.log(n_stems)
         self.model_stems += np.random.randn(n_stems)
         self.model_stems = normalize(self.model_stems)
         # Character model or stem model?

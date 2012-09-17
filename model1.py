@@ -6,11 +6,11 @@ from corpus import STEM
 class Model1(Model):
     def uniform_init(self, n_morphemes, n_stems):
         # Morphemes
-        self.model_morphemes = np.zeros(n_morphemes) - np.log(n_morphemes)
+        self.model_morphemes = np.zeros(n_morphemes) - math.log(n_morphemes)
         self.model_morphemes += np.random.randn(n_morphemes)
         self.model_morphemes = normalize(self.model_morphemes)
         # Stems
-        self.model_stems = np.zeros(n_stems) - np.log(n_stems)
+        self.model_stems = np.zeros(n_stems) - math.log(n_stems)
         self.model_stems += np.random.randn(n_stems)
         self.model_stems = normalize(self.model_stems)
         # Length

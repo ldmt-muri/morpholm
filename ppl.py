@@ -1,38 +1,39 @@
 import sys
 import cPickle
+import math
 import numpy as np
 import kenlm
-from corpus import Analysis, FSM
+from corpus import Analysis, FSM, OOV, AnalysisError
 
-LOG10 = np.log(10)
+LOG10 = math.log(10)
 class CharLM:
     def prob(self, word):
         return self.char_lm.score(' '.join(word))*LOG10
 
-def main(vocab_file, model_file, charlm, fst):
-    with open(vocab_file) as fp:
-        vocabulary = cPickle.load(fp)
-    with open(model_file) as fp:
-        model = cPickle.load(fp)
-    #model = CharLM()
+def print_ppl(vocabulary, model, char_lm, fsm, test_corpus):
     model.vocabulary = vocabulary
-    model.char_lm = kenlm.LanguageModel(charlm)
+    model.char_lm = char_lm
     vocabulary['morpheme'].frozen = True
     vocabulary['stem'].frozen = True
-    fsm = FSM(fst)
 
     total_prob, total_viterbi_stem, total_viterbi_morph = 0, 0, 0
     n_words = 0
 
-    print('Reading corpus...')
-    for line in sys.stdin:
+    print('Reading evaluation corpus...')
+    for line in test_corpus:
         words = line.decode('utf8').split()
         for word in words:
             analyses = fsm.get_analyses(word)
-            if not analyses: continue
             n_words += 1
             #total_prob += model.prob(word) # for baseline char lm
-            analyses = [Analysis(analysis, vocabulary) for analysis in analyses]
+            try:
+                analyses = [Analysis(analysis, vocabulary) for analysis in analyses]
+            except OOV as oov:
+                print('Ignored analysis with OOV morpheme: {0}'.format(oov))
+                continue
+            except AnalysisError as analysis:
+                print('Analyzis error for {0}: {1}'.format(word, analysis))
+                continue
             all_probs = np.array(map(model.probs, analyses))
             probs = all_probs.sum(axis=1)
             viterbi = all_probs[probs.argmax()]
@@ -53,6 +54,14 @@ def main(vocab_file, model_file, charlm, fst):
     print('    Perplexity: {0:.3f}'.format(ppl))
     print('Vit Perplexity: {0:.3f} = (morph) {1:.3f} * (stem) {2:.3f}'.format(ppl_viterbi,
         ppl_viterbi_morph, ppl_viterbi_stem))
+
+def main(vocab_file, model_file, charlm, fst):
+    with open(vocab_file) as fp:
+        vocabulary = cPickle.load(fp)
+    with open(model_file) as fp:
+        model = cPickle.load(fp)
+    #model = CharLM()
+    print_ppl(vocabulary, model, kenlm.LanguageModel(charlm), FSM(fst), sys.stdin)
 
 if __name__ == '__main__':
     if len(sys.argv) != 5:
