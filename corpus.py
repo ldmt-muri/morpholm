@@ -97,8 +97,8 @@ class Analysis:
         return len(self.morphemes) - 1
 
 class Corpus:
-    def __init__(self):
-        self.sentences = []
+    def __init__(self, sentences=[]):
+        self.sentences = sentences
 
     def __iter__(self):
         for sentence in self.sentences:
