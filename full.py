@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import argparse
-import kenlm
+from model import CharLM
 import model1, model2, baseline
 from corpus import FSM, analyze_corpus
 import em, tune, ppl
@@ -20,7 +20,20 @@ def main():
     args = parser.parse_args()
 
     fsm = FSM(args.fst)
-    char_lm = kenlm.LanguageModel(args.charlm)
+    char_lm = CharLM(args.charlm)
+
+    """
+    import cPickle
+    with open('models/model1.pickle') as m1:
+        char_lm = cPickle.load(m1)
+    with open('models/vocab.pickle') as voc:
+        char_lm.vocabulary = cPickle.load(voc)
+        char_lm.vocabulary['stem'].frozen = True
+        char_lm.vocabulary['morpheme'].frozen = True
+    char_lm.fsm = fsm
+    char_lm.char_lm = CharLM(args.charlm)
+    """
+
     if args.model:
         print('Training Model: {0}'.format(MODELS[int(args.model)]))
         # Train

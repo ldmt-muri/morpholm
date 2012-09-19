@@ -3,8 +3,6 @@ import numpy as np
 from collections import Counter
 from corpus import Vocabulary, OOV
 
-LOG10 = math.log(10)
-
 class Model0:
     def __init__(self, counts):
         N = sum(counts.itervalues())
@@ -20,8 +18,7 @@ class Model0:
             return -np.inf
 
     def char_prob(self, word):
-        chars = ' '.join(word)
-        return self.char_lm.score(chars)*LOG10
+        return self.char_lm.prob(word)
 
     def prob(self, word):
         sp = self.token_prob(word) + math.log(1-self.model_char)
@@ -48,7 +45,7 @@ def tune_model(vocabulary, model, char_lm, dev_corpus):
     model.model_char = 0.5
     vocabulary.frozen = True
 
-    print('Analyzing development corpus...')
+    print('Reading development corpus...')
     corpus_probs = []
     for line in dev_corpus:
         words = line.decode('utf8').split()

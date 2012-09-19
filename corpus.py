@@ -105,9 +105,13 @@ class Corpus:
             for word in sentence:
                 yield word
 
+    def __len__(self):
+        return sum(len(sentence) for sentence in self.sentences)
+
+# TODO: store analyzes!!!
 def analyze_corpus(fsm, stream):
     vocabulary = {'morpheme': Vocabulary(), 'stem': Vocabulary()}
-    assert (vocabulary['morpheme']['stem'] == STEM)
+    assert (vocabulary['morpheme']['***STEM***'] == STEM)
     corpus = Corpus()
     sys.stderr.write('Reading corpus ')
     for i, sentence in enumerate(stream):

@@ -2,7 +2,7 @@ import sys
 import cPickle
 import math
 import numpy as np
-import kenlm
+from model import CharLM
 from corpus import Analysis, FSM, OOV, AnalysisError
 
 def tune_model(vocabulary, model, char_lm, fsm, dev_corpus):
@@ -53,7 +53,7 @@ def main(vocab_file, model_file, charlm, fst):
         vocabulary = cPickle.load(fp)
     with open(model_file) as fp:
         model = cPickle.load(fp)
-    tune_model(vocabulary, model, kenlm.LanguageModel(charlm), FSM(fst), sys.stdin)
+    tune_model(vocabulary, model, CharLM(charlm), FSM(fst), sys.stdin)
     with open(model_file, 'w') as fp:
         cPickle.dump(model, fp, protocol=2)
 

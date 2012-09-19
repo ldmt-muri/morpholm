@@ -9,10 +9,10 @@ def train_model(Model, corpus, vocabulary):
     n_morphemes = len(vocabulary['morpheme'])
     n_stems = len(vocabulary['stem'])
     model = Model()
-    model.uniform_init(n_morphemes, n_stems)
-    model.run_em(Niter, corpus)
-    #model.init_sampler(n_morphemes, n_stems, 1, 1, 1, 1)
-    #model.run_sampler(Niter, corpus)
+    #model.uniform_init(n_morphemes, n_stems)
+    #model.run_em(Niter, corpus)
+    model.init_sampler(n_morphemes, n_stems, 1, 1, 1, 1)
+    model.run_sampler(Niter, corpus)
     return model
 
 def main(vocab_file, corpus_file, out):

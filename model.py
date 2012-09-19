@@ -1,6 +1,8 @@
 from itertools import izip
 import math
 import numpy as np
+import kenlm
+from corpus import Analysis
 
 marginalize = np.logaddexp.reduce
 
@@ -13,12 +15,15 @@ def smooth(model): # add-1 smoothing
 
 LOG10 = math.log(10)
 
+class CharLM(kenlm.LanguageModel):
+    def prob(self, word):
+        # KenLM score is logarithm in base 10
+        return self.score(' '.join(word))*LOG10
+
 class Model:
     def char_lm_prob(self, analysis):
         stem = analysis.decode_stem(self.vocabulary['stem'])
-        chars = ' '.join(stem)
-        # KenLM score is logarithm in base 10
-        return self.char_lm.score(chars)*LOG10
+        return self.char_lm.prob(stem)
 
     # log(p_stem(analysis))
     def stem_prob(self, analysis):
@@ -29,20 +34,26 @@ class Model:
     def char_prob(self, analysis):
         return self.common_prob(analysis) + self.char_lm_prob(analysis)
 
-    # log(p(analysis)),
-    def prob(self, analysis):
+    # log(p(analysis))
+    def analysis_prob(self, analysis):
         sp = self.stem_prob(analysis) + math.log(1-self.model_char)
         cp = self.char_prob(analysis) + math.log(self.model_char)
         if sp == cp == -np.inf: return -np.inf
         return np.logaddexp(sp, cp)
 
-    # log(p_morph), log(p_stem)
+    # log(p_morph), log(p_stem+char)
     def probs(self, analysis):
         sp = (-np.inf if analysis.oov else
                 self.model_stems[analysis.stem] + math.log(1-self.model_char))
         cp = self.char_lm_prob(analysis) + math.log(self.model_char)
         p_stem = np.logaddexp(sp, cp)
         return (self.common_prob(analysis), p_stem)
+
+    # log(p(word)) = log(sum_analyses p(analysis))
+    def prob(self, word):
+        analyses = self.fsm.get_analyses(word)
+        coded = [Analysis(analysis, self.vocabulary) for analysis in analyses]
+        return np.logaddexp.reduce(map(self.analysis_prob, coded))
 
     def run_em(self, n_iterations, corpus):
         for it in range(n_iterations):

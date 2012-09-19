@@ -1,14 +1,8 @@
 import sys
 import cPickle
-import math
 import numpy as np
-import kenlm
+from model import CharLM
 from corpus import Analysis, FSM, OOV, AnalysisError
-
-LOG10 = math.log(10)
-class CharLM:
-    def prob(self, word):
-        return self.char_lm.score(' '.join(word))*LOG10
 
 def print_ppl(vocabulary, model, char_lm, fsm, test_corpus):
     model.vocabulary = vocabulary
@@ -61,7 +55,7 @@ def main(vocab_file, model_file, charlm, fst):
     with open(model_file) as fp:
         model = cPickle.load(fp)
     #model = CharLM()
-    print_ppl(vocabulary, model, kenlm.LanguageModel(charlm), FSM(fst), sys.stdin)
+    print_ppl(vocabulary, model, CharLM(charlm), FSM(fst), sys.stdin)
 
 if __name__ == '__main__':
     if len(sys.argv) != 5:
