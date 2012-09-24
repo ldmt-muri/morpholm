@@ -9,7 +9,7 @@
 
 ## Combined training + evaluation
 
-To run Unigram Model 2 (~1h & 8G on the Global Voices data):
+To run Unigram Model 2 (~20m & 1G on the Global Voices data):
 
     python full.py --train training-corpus.txt --dev dev-corpus.txt --test test-corpus.txt\
         --fst analyzer.fst --charlm charlm.klm --model 2

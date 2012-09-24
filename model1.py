@@ -1,7 +1,6 @@
 import math
 import numpy as np
 from model import Model, normalize, smooth
-from corpus import STEM
 
 class Model1(Model):
     def uniform_init(self, n_morphemes, n_stems):
@@ -15,19 +14,14 @@ class Model1(Model):
         self.model_stems = normalize(self.model_stems)
         # Length
         self.model_length = 1
-        # Character model or stem model?
-        self.model_char = 0
 
     def init_counts(self):
         self.count_morphemes = np.zeros(len(self.model_morphemes)) - np.inf
         self.count_stems = np.zeros(len(self.model_stems)) - np.inf
         self.count_length = [0.0, 0.0]
-        #self.count_char = -np.inf
-        #self.count_words = 0
 
     def cleanup(self):
-        del self.count_morphemes, self.count_stems, self.count_length, \
-                #self.count_char, self.count_words
+        del self.count_morphemes, self.count_stems, self.count_length
 
     def length_prob(self, length):
         # ss.poisson.logpmf(length, self.model_length)
@@ -35,15 +29,11 @@ class Model1(Model):
                 length * math.log(self.model_length)
                 - math.lgamma(length + 1))
 
-    def morpheme_prob(self, morpheme):
-        if morpheme == STEM: return 0
-        return self.model_morphemes[morpheme]
-
     def common_prob(self, analysis):
         # p(len)
         lp = self.length_prob(len(analysis))
         # p(morphemes)
-        lp += sum(self.morpheme_prob(morpheme) for morpheme in analysis.morphemes)
+        lp += sum(self.model_morphemes[morpheme] for morpheme in analysis.non_stem_morphemes)
         return lp
 
     # E step counts
@@ -52,9 +42,7 @@ class Model1(Model):
         self.count_length[0] += len(analysis) * prob
         self.count_length[1] += prob
         self.count_stems[analysis.stem] = np.logaddexp(self.count_stems[analysis.stem], lp)
-        #self.count_char = np.logaddexp(self.count_char, lp_char)
-        for morpheme in analysis.morphemes:
-            if morpheme == STEM: continue
+        for morpheme in analysis.non_stem_morphemes:
             self.count_morphemes[morpheme] = np.logaddexp(self.count_morphemes[morpheme], lp)
 
     # M step
@@ -62,10 +50,8 @@ class Model1(Model):
         self.model_morphemes = normalize(smooth(self.count_morphemes))
         self.model_stems = normalize(smooth(self.count_stems))
         self.model_length = self.count_length[0] / self.count_length[1]
-        #self.model_char = np.exp(self.count_char)/self.count_words
         print(self.model_morphemes)
         print('Morph length: {0}'.format(self.model_length))
-        #print('p(char): {}'.format(self.model_char))
 
     def init_sampler(self, n_morphemes, n_stems, alpha, beta, gamma, delta):
         self.count_morphemes = np.zeros(n_morphemes, int)
@@ -80,8 +66,7 @@ class Model1(Model):
         self.count_length[0] += len(analysis)*c
         self.count_length[1] += c
         self.count_stems[analysis.stem] += c
-        for morpheme in analysis.morphemes:
-            if morpheme == STEM: continue
+        for morpheme in analysis.non_stem_morphemes:
             self.count_morphemes[morpheme] += c
 
     def pred_weight(self, analysis):
@@ -100,8 +85,7 @@ class Model1(Model):
         S = len(self.count_morphemes)
         w *= (self.alpha + self.count_stems[analysis.stem])/(S * self.alpha + N - 1)
         # morphemes
-        for morpheme in set(analysis.morphemes):
-            if morpheme == STEM: continue
+        for morpheme in analysis.non_stem_morphemes:
             w *= (self.beta + self.count_morphemes[morpheme])
         M = len(self.count_morphemes)
         w *= math.exp(math.lgamma(M * self.beta + L)
@@ -117,7 +101,6 @@ class Model1(Model):
         self.model_stems = self.count_stems + self.alpha
         self.model_stems /= self.model_stems.sum()
         self.model_stems = np.log(self.model_stems)
-        L, N = self.count_length
         self.model_length =  (L + self.gamma)/(N + self.delta)
         print(self.model_morphemes)
         print('Morph length: {0}'.format(self.model_length))

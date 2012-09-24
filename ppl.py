@@ -4,11 +4,11 @@ import numpy as np
 from model import CharLM
 from corpus import Analysis, FSM, OOV, AnalysisError
 
-def print_ppl(vocabulary, model, char_lm, fsm, test_corpus):
-    model.vocabulary = vocabulary
+def print_ppl(vocabularies, model, char_lm, fsm, test_corpus):
+    model.vocabularies = vocabularies
     model.char_lm = char_lm
-    vocabulary['morpheme'].frozen = True
-    vocabulary['stem'].frozen = True
+    vocabularies['morpheme'].frozen = True
+    vocabularies['stem'].frozen = True
 
     total_prob, total_viterbi_stem, total_viterbi_morph = 0, 0, 0
     n_words = 0
@@ -21,7 +21,7 @@ def print_ppl(vocabulary, model, char_lm, fsm, test_corpus):
             n_words += 1
             #total_prob += model.prob(word) # for baseline char lm
             try:
-                analyses = [Analysis(analysis, vocabulary) for analysis in analyses]
+                analyses = [Analysis(analysis, vocabularies) for analysis in analyses]
             except OOV as oov:
                 print('Ignored analysis with OOV morpheme: {0}'.format(oov))
                 continue
@@ -51,11 +51,11 @@ def print_ppl(vocabulary, model, char_lm, fsm, test_corpus):
 
 def main(vocab_file, model_file, charlm, fst):
     with open(vocab_file) as fp:
-        vocabulary = cPickle.load(fp)
+        vocabularies = cPickle.load(fp)
     with open(model_file) as fp:
         model = cPickle.load(fp)
     #model = CharLM()
-    print_ppl(vocabulary, model, CharLM(charlm), FSM(fst), sys.stdin)
+    print_ppl(vocabularies, model, CharLM(charlm), FSM(fst), sys.stdin)
 
 if __name__ == '__main__':
     if len(sys.argv) != 5:

@@ -5,12 +5,16 @@ import numpy as np
 from model import CharLM
 from corpus import Analysis, FSM, OOV, AnalysisError
 
-def tune_model(vocabulary, model, char_lm, fsm, dev_corpus):
-    model.vocabulary = vocabulary
+def _marginalize(lps):
+    lps = [lp for lp in lps if lp != -np.inf]
+    if len(lps) == 0: return -np.inf
+    return np.logaddexp.reduce(lps)
+
+def tune_model(vocabularies, model, char_lm, fsm, dev_corpus):
+    model.vocabularies = vocabularies
     model.char_lm = char_lm
-    model.model_char = 0.5 # Instead of 0
-    vocabulary['morpheme'].frozen = True
-    vocabulary['stem'].frozen = True
+    vocabularies['morpheme'].frozen = True
+    vocabularies['stem'].frozen = True
 
     print('Analyzing development corpus...')
     corpus_probs = []
@@ -19,7 +23,7 @@ def tune_model(vocabulary, model, char_lm, fsm, dev_corpus):
         for word in words:
             analyses = fsm.get_analyses(word)
             try:
-                analyses = [Analysis(analysis, vocabulary) for analysis in analyses]
+                analyses = [Analysis(analysis, vocabularies) for analysis in analyses]
             except OOV as oov:
                 print('Ignored analysis with OOV morpheme: {0}'.format(oov))
                 continue
@@ -28,11 +32,12 @@ def tune_model(vocabulary, model, char_lm, fsm, dev_corpus):
                 continue
             stem_probs = map(model.stem_prob, analyses)
             char_probs = map(model.char_prob, analyses)
-            sp = np.logaddexp.reduce(stem_probs)
+            sp = _marginalize(stem_probs)
             cp = np.logaddexp.reduce(char_probs)
             corpus_probs.append((sp, cp))
 
     print('Optimizing...')
+    model.model_char = 0.5
     Niter = 10
     for it in range(Niter):
         count = -np.inf
@@ -46,14 +51,14 @@ def tune_model(vocabulary, model, char_lm, fsm, dev_corpus):
     print('Best p_char: {}'.format(model.model_char))
     print('Updating model...')
     del model.char_lm
-    del model.vocabulary
+    del model.vocabularies
 
 def main(vocab_file, model_file, charlm, fst):
     with open(vocab_file) as fp:
-        vocabulary = cPickle.load(fp)
+        vocabularies = cPickle.load(fp)
     with open(model_file) as fp:
         model = cPickle.load(fp)
-    tune_model(vocabulary, model, CharLM(charlm), FSM(fst), sys.stdin)
+    tune_model(vocabularies, model, CharLM(charlm), FSM(fst), sys.stdin)
     with open(model_file, 'w') as fp:
         cPickle.dump(model, fp, protocol=2)
 

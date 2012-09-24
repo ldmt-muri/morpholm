@@ -22,7 +22,7 @@ class CharLM(kenlm.LanguageModel):
 
 class Model:
     def char_lm_prob(self, analysis):
-        stem = analysis.decode_stem(self.vocabulary['stem'])
+        stem = analysis.decode_stem(self.vocabularies['stem'])
         return self.char_lm.prob(stem)
 
     # log(p_stem(analysis))
@@ -52,8 +52,8 @@ class Model:
     # log(p(word)) = log(sum_analyses p(analysis))
     def prob(self, word):
         analyses = self.fsm.get_analyses(word)
-        coded = [Analysis(analysis, self.vocabulary) for analysis in analyses]
-        return np.logaddexp.reduce(map(self.analysis_prob, coded))
+        coded = [Analysis(analysis, self.vocabularies) for analysis in analyses]
+        return marginalize(map(self.analysis_prob, coded))
 
     def run_em(self, n_iterations, corpus):
         for it in range(n_iterations):
@@ -61,7 +61,8 @@ class Model:
             self.init_counts()
             loglik = 0
             # Expectation
-            for analyses in corpus:
+            for word in corpus:
+                analyses = corpus.analyses[word]
                 probs = map(self.stem_prob, analyses)
                 #probs = marginalize((stem_probs, char_probs)) # p(char)+p(stem)
                 norm = marginalize(probs)
@@ -79,12 +80,14 @@ class Model:
         assignments = np.zeros(len(corpus), int)
         for it in range(n_iterations):
             print('Iteration {0}:'.format(it+1))
-            for i, analyses in enumerate(corpus):
+            for i, word in enumerate(corpus):
+                analyses = corpus.analyses[word]
                 if it > 0: self.increment(analyses[assignments[i]], -1)
                 assignments[i] = self.sample(analyses)
                 self.increment(analyses[assignments[i]], 1)
             self.map_estimate()
-            loglik = sum(marginalize(map(self.stem_prob, analyses)) for analyses in corpus)
+            loglik = sum(marginalize(map(self.stem_prob, corpus.analyses[word]))
+                    for word in corpus)
             print(' Log likelihood: {0}'.format(loglik))
         self.cleanup()
 

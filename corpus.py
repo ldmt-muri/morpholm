@@ -48,9 +48,8 @@ class Vocabulary:
 
 analysis_fix = re.compile('A\+(\d)')
 
-# TODO: cache to reduce memory usage
 class Analysis:
-    def __init__(self, analysis, vocabulary):
+    def __init__(self, analysis, vocabularies):
         """ Split the morphemes from the output of the analyzer """
         analysis = analysis_fix.sub(r'a+\1', analysis) # ??????????????
         morphs = analysis.split('+')
@@ -60,12 +59,12 @@ class Analysis:
         self.stem = None
         for morph in morphs:
             if morphRE.search(morph): # non-stem
-                self.morphemes.append(vocabulary['morpheme'][morph])
+                self.morphemes.append(vocabularies['morpheme'][morph])
             else: # stem
                 try:
                     if self.stem is not None:
                         raise AnalysisError(analysis)
-                    self.stem = vocabulary['stem'][morph]
+                    self.stem = vocabularies['stem'][morph]
                 except OOV:
                     self.stem = morph # do not encode
                     self.oov = True
@@ -84,6 +83,10 @@ class Analysis:
         return vocabulary[self.stem]
 
     @property
+    def non_stem_morphemes(self):
+        return (morpheme for morpheme in self.morphemes if morpheme != STEM)
+
+    @property
     def right_morphemes(self):
         self.split()
         return self._right
@@ -97,7 +100,7 @@ class Analysis:
         return len(self.morphemes) - 1
 
 class Corpus:
-    def __init__(self, sentences=[]):
+    def __init__(self, sentences):
         self.sentences = sentences
 
     def __iter__(self):
@@ -108,24 +111,39 @@ class Corpus:
     def __len__(self):
         return sum(len(sentence) for sentence in self.sentences)
 
-# TODO: store analyzes!!!
-def analyze_corpus(fsm, stream):
-    vocabulary = {'morpheme': Vocabulary(), 'stem': Vocabulary()}
-    assert (vocabulary['morpheme']['***STEM***'] == STEM)
-    corpus = Corpus()
+def init_vocabularies():
+    vocabularies = {'word': Vocabulary(),
+                    'morpheme': Vocabulary(),
+                    'stem': Vocabulary()}
+    assert (vocabularies['morpheme']['stem'] == STEM)
+    return vocabularies
+
+def analyze_corpus(stream, fsm, vocabularies, word_analyses):
     sys.stderr.write('Reading corpus ')
+    N = 0
+    sentences = []
     for i, sentence in enumerate(stream):
         if i % 1000 == 0:
             sys.stderr.write('.')
             sys.stderr.flush()
-        analyzed_sentence = []
+        words = []
         for word in sentence.decode('utf8').split():
-            analyses = fsm.get_analyses(word)
+            N += 1
+            w = vocabularies['word'][word]
             try:
-                analyses = [Analysis(analysis, vocabulary) for analysis in analyses]
-                analyzed_sentence.append(analyses)
+                if w in word_analyses:
+                    analyses = word_analyses[w]
+                else:
+                    analyses = fsm.get_analyses(word)
+                    analyses = [Analysis(analysis, vocabularies) for analysis in analyses]
+                    word_analyses[w] = analyses
+                words.append(w)
             except AnalysisError as analysis:
                 print('Analyzis error for {0}: {1}'.format(word, analysis))
-        corpus.sentences.append(analyzed_sentence)
+        sentences.append(words)
     sys.stderr.write(' done\n')
-    return corpus, vocabulary
+    return Corpus(sentences)
+
+def encode_corpus(stream, vocabulary):
+    return Corpus([[vocabulary[word] for word in sentence.decode('utf8').split()]
+                        for sentence in stream])

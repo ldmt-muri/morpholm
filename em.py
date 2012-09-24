@@ -5,22 +5,24 @@ from model1 import Model1
 #from model22 import Model22
 
 Niter = 10
-def train_model(Model, corpus, vocabulary):
-    n_morphemes = len(vocabulary['morpheme'])
-    n_stems = len(vocabulary['stem'])
+def train_model(Model, corpus, vocabularies, sampler=False):
+    n_morphemes = len(vocabularies['morpheme'])
+    n_stems = len(vocabularies['stem'])
     model = Model()
-    #model.uniform_init(n_morphemes, n_stems)
-    #model.run_em(Niter, corpus)
-    model.init_sampler(n_morphemes, n_stems, 1, 1, 1, 1)
-    model.run_sampler(Niter, corpus)
+    if sampler:
+        model.init_sampler(n_morphemes, n_stems, 1, 1, 1, 1)
+        model.run_sampler(Niter, corpus)
+    else:
+        model.uniform_init(n_morphemes, n_stems)
+        model.run_em(Niter, corpus)
     return model
 
 def main(vocab_file, corpus_file, out):
     with open(vocab_file) as fp:
-        vocabulary = cPickle.load(fp)
+        vocabularies = cPickle.load(fp)
     with open(corpus_file) as fp:
         corpus = cPickle.load(fp)
-    model = train_model(Model1, corpus, vocabulary)
+    model = train_model(Model1, corpus, vocabularies, True)
     with open(out, 'w') as fp:
         cPickle.dump(model, fp, protocol=2)
 
