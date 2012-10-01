@@ -1,6 +1,7 @@
 import math
 import numpy as np
 from collections import defaultdict
+from itertools import tee, izip
 from prob import mult_sample, remove_random, DirichletMultinomial, GammaPoisson
 
 class PoissonUnigram:
@@ -8,33 +9,69 @@ class PoissonUnigram:
         self.morpheme_model = DirichletMultinomial(K, beta)
         self.length_model = GammaPoisson(gamma, delta)
 
-    def increment(self, analysis):
-        for morpheme in analysis.non_stem_morphemes:
+    def increment(self, pattern):
+        for morpheme in pattern:
             self.morpheme_model.increment(morpheme)
-        self.length_model.increment(len(analysis))
+        self.length_model.increment(len(pattern))
 
-    def decrement(self, analysis):
-        for morpheme in analysis.non_stem_morphemes:
+    def decrement(self, pattern):
+        for morpheme in pattern:
             self.morpheme_model.decrement(morpheme)
-        self.length_model.decrement(len(analysis))
+        self.length_model.decrement(len(pattern))
 
-    def pred_weight(self, analysis):
-        return (sum(map(self.morpheme_model.pred_weight, analysis.non_stem_morphemes)) +
-                self.morpheme_model.gamma_factor(len(analysis)) +
-                self.length_model.pred_weight(len(analysis)))
+    def pred_weight(self, pattern):
+        return (sum(map(self.morpheme_model.pred_weight, pattern)) +
+                self.morpheme_model.gamma_factor(len(pattern)) +
+                self.length_model.pred_weight(len(pattern)))
 
-    def prob(self, analysis):
-        return (sum(map(self.morpheme_model.prob, analysis.non_stem_morphemes)) +
-                self.length_model.prob(len(analysis)))
+    def prob(self, pattern):
+        return (sum(map(self.morpheme_model.prob, pattern)) +
+                self.length_model.prob(len(pattern)))
 
     def __str__(self):
         return 'PoissonUnigram(length ~ {self.length_model}, morph ~ {self.morpheme_model})'.format(self=self)
 
+class Bigram:
+    def __init__(self, K, beta):
+        self.morpheme_models = [DirichletMultinomial(K+1, beta) for _ in range(K+1)]
+        self.START = K
+        self.STOP = K
+
+    def _unigrams(self, pattern):
+        yield self.START
+        for m in pattern.morphemes:
+            yield m
+        yield self.STOP
+
+    def _bigrams(self, pattern):
+        a, b = tee(self._unigrams(pattern))
+        next(b)
+        return izip(a, b)
+
+    def increment(self, pattern):
+        for x, y in self._bigrams(pattern):
+            self.morpheme_models[x].increment(y)
+
+    def decrement(self, pattern):
+        for x, y in self._bigrams(pattern):
+            self.morpheme_models[x].decrement(y)
+    
+    def pred_weight(self, pattern):
+        return sum(self.morpheme_models[x].prob(y) + self.morpheme_models[x].gamma_factor(1)
+                for x, y in self._bigrams(pattern))
+
+    def prob(self, pattern):
+        return sum(self.morpheme_models[x].prob(y) for x, y in self._bigrams(pattern))
+
+    def __str__(self):
+        return 'Bigram(stem\'|stem ~ Mult ~ Dir)'
+
 class MorphoProcess:
-    def __init__(self, stem_model, morpheme_model):
+    def __init__(self, stem_model, morpheme_model, analyses):
         self.stem_model = stem_model
         self.morpheme_model = morpheme_model
         self.assignments = defaultdict(list)
+        self.analyses = analyses
 
     def increment(self, k):
         # Sample analysis & store assignment
@@ -45,22 +82,22 @@ class MorphoProcess:
         analysis = self.analyses[k][i]
         # Increment models
         self.stem_model.increment(analysis.stem)
-        self.morpheme_model.increment(analysis)
+        self.morpheme_model.increment(analysis.pattern)
 
     def decrement(self, k):
         # Select assigned analysis randomly and remove it
         analysis = self.analyses[k][remove_random(self.assignments[k])]
         # Decrement models
         self.stem_model.decrement(analysis.stem)
-        self.morpheme_model.decrement(analysis)
+        self.morpheme_model.decrement(analysis.pattern)
 
     def pred_weight(self, analysis):
         return (self.stem_model.pred_weight(analysis.stem) +
-                self.morpheme_model.pred_weight(analysis))
+                self.morpheme_model.pred_weight(analysis.pattern))
 
     def analysis_prob(self, analysis):
         return (self.stem_model.prob(analysis.stem) +
-                self.morpheme_model.prob(analysis))
+                self.morpheme_model.prob(analysis.pattern))
 
     def prob(self, k):
         return np.logaddexp.reduce([self.analysis_prob(analysis)

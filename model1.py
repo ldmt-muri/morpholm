@@ -31,18 +31,19 @@ class Model1(Model):
 
     def common_prob(self, analysis):
         # p(len)
-        lp = self.length_prob(len(analysis))
+        lp = self.length_prob(len(analysis.pattern))
         # p(morphemes)
-        lp += sum(self.model_morphemes[morpheme] for morpheme in analysis.non_stem_morphemes)
+        lp += sum(self.model_morphemes[morpheme] 
+                for morpheme in analysis.pattern)
         return lp
 
     # E step counts
     def count(self, analysis, lp):
         prob = np.exp(lp)
-        self.count_length[0] += len(analysis) * prob
+        self.count_length[0] += len(analysis.pattern) * prob
         self.count_length[1] += prob
         self.count_stems[analysis.stem] = np.logaddexp(self.count_stems[analysis.stem], lp)
-        for morpheme in analysis.non_stem_morphemes:
+        for morpheme in analysis.pattern:
             self.count_morphemes[morpheme] = np.logaddexp(self.count_morphemes[morpheme], lp)
 
     # M step
@@ -63,15 +64,15 @@ class Model1(Model):
         self.delta = float(delta)
 
     def increment(self, analysis, c):
-        self.count_length[0] += len(analysis)*c
+        self.count_length[0] += len(analysis.pattern)*c
         self.count_length[1] += c
         self.count_stems[analysis.stem] += c
-        for morpheme in analysis.non_stem_morphemes:
+        for morpheme in analysis.pattern:
             self.count_morphemes[morpheme] += c
 
     def pred_weight(self, analysis):
         L, N = self.count_length
-        l = len(analysis)
+        l = len(analysis.pattern)
         # length
         # ss.nbinom.pmf(l, L + self.gamma, (N + self.delta)/(N + self.delta + 1))
         # = math.exp(math.lgamma(l + L + self.gamma)
@@ -85,7 +86,7 @@ class Model1(Model):
         S = len(self.count_morphemes)
         w *= (self.alpha + self.count_stems[analysis.stem])/(S * self.alpha + N - 1)
         # morphemes
-        for morpheme in analysis.non_stem_morphemes:
+        for morpheme in analysis.pattern:
             w *= (self.beta + self.count_morphemes[morpheme])
         M = len(self.count_morphemes)
         w *= math.exp(math.lgamma(M * self.beta + L)

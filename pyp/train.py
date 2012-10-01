@@ -4,7 +4,7 @@ import math
 from corpus import FSM, Vocabulary, analyze_corpus, encode_corpus, init_vocabularies
 from prob import CharLM #, DirichletMultinomial, FixedMixModel
 from pyp import PYP
-from model import MorphoProcess, PoissonUnigram
+from model import MorphoProcess, Bigram #, PoissonUnigram
 
 theta = 1.0
 d = 0.8
@@ -14,9 +14,7 @@ beta = 1.0
 gamma = 1.0
 delta = 1.0
 
-Niter = 10
-
-def run_sampler(model, corpus):
+def run_sampler(model, corpus, Niter):
     for it in range(Niter):
         logging.info('Iteration %d/%d', it+1, Niter)
         for word in corpus:
@@ -42,6 +40,7 @@ def main():
     parser.add_argument('--test', help='evaluation corpus', required=True)
     parser.add_argument('--fst', help='compiled morphoanalyzer')
     parser.add_argument('--charlm', help='character language model (KenLM format)', required=True)
+    parser.add_argument('-i', '--iter', help='number of iterations', required=True, type=int)
     args = parser.parse_args()
 
     char_lm = CharLM(args.charlm)
@@ -56,25 +55,34 @@ def main():
         with open(args.train) as train:
             training_corpus = analyze_corpus(train, fsm, vocabularies, word_analyses)
 
-        logging.info('Corpus size: %d words', len(training_corpus))
+        n_words = len(vocabularies['word'])
         n_stems = len(vocabularies['stem'])
         n_morphemes = len(vocabularies['morpheme'])
-        logging.info('Voc size: %d words / %d morphemes / %d stems', len(vocabularies['word']),
-                n_morphemes, n_stems)
+        n_analyses = sum(len(analyzes) for analyzes in word_analyses.itervalues())
+        n_patterns = len(set(analysis.pattern for analyses in word_analyses.itervalues()
+                             for analysis in analyses))
+
+        logging.info('Corpus size: %d tokens', len(training_corpus))
+        logging.info('Voc size: %d words / %d morphemes / %d stems',
+                n_words, n_morphemes, n_stems)
+        logging.info('Analyses: %d total -> %d patterns', n_analyses, n_patterns)
+
+        assert len(word_analyses) == n_words
 
         char_lm.vocabulary = vocabularies['stem']
-        mp = MorphoProcess(PYP(alpha, p, char_lm), PoissonUnigram(n_morphemes, beta, gamma, delta))
-        #mp = MorphoProcess(DirichletMultinomial(n_stems, alpha), PoissonUnigram(n_morphemes, beta, gamma, delta))
-        mp.analyses = word_analyses
+        #mp = MorphoProcess(DirichletMultinomial(n_stems, alpha), PoissonUnigram(n_morphemes, beta, gamma, delta), word_analyses)
+        #mp = MorphoProcess(PYP(alpha, p, char_lm), PoissonUnigram(n_morphemes, beta, gamma, delta), word_analyses)
+        #mp = MorphoProcess(PYP(alpha, p, char_lm), Bigram(n_morphemes, beta), word_analyses)
+        mp = MorphoProcess(PYP(alpha, p, char_lm), PYP(alpha, p, Bigram(n_morphemes, beta)), word_analyses)
 
-        #model = PYP(theta, d, mp)
-        model = mp
+        model = PYP(theta, d, mp)
+        #model = mp
 
         logging.info('Training model')
-        run_sampler(model, training_corpus)
+        run_sampler(model, training_corpus, args.iterations)
 
         """
-        # Make mixture
+        # Make mixture (if mp = MP(DirMult, *))
         p_char = 0.0303856942301
         mp.stem_model = FixedMixModel([mp.stem_model, char_lm], [1-p_char, p_char])
         """
@@ -93,13 +101,13 @@ def main():
         with open(args.train) as train:
             training_corpus = encode_corpus(train, vocabulary)
 
-        logging.info('Corpus size: %d words | Voc size: %d words', len(training_corpus), len(vocabulary))
+        logging.info('Corpus size: %d tokens | Voc size: %d words', len(training_corpus), len(vocabulary))
 
         char_lm.vocabulary = vocabulary
         model = PYP(theta, d, char_lm)
 
         logging.info('Training model')
-        run_sampler(model, training_corpus)
+        run_sampler(model, training_corpus, args.iterations)
 
         logging.info('Computing test corpus perplexity')
         with open(args.test) as test:

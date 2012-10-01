@@ -66,7 +66,7 @@ class DirichletMultinomial:
 
     def gamma_factor(self, n):
         if n == 0: return 0
-        # = 1/(K*alpha + N-) if n == 1
+        if n == 1: return -math.log(self.K * self.alpha + self.N)
         return (math.lgamma(self.K * self.alpha + self.N)
                 - math.lgamma(self.K * self.alpha + self.N + n))
 

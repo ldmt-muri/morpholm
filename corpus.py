@@ -48,6 +48,39 @@ class Vocabulary:
 
 analysis_fix = re.compile('A\+(\d)')
 
+class MorphemePattern:
+    def __init__(self, morphemes):
+        self.morphemes = morphemes
+        self._hash = hash(tuple(self.morphemes))
+
+    @property
+    def right_morphemes(self):
+        self._split()
+        return self._right
+
+    @property
+    def left_morphemes(self):
+        self._split()
+        return self._left
+
+    def _split(self):
+        if not hasattr(self, '_right'):
+            stem_index = self.morphemes.index(STEM)
+            self._left = self.morphemes[stem_index-1::-1]
+            self._right = self.morphemes[stem_index+1:]
+
+    def __iter__(self):
+        return (morpheme for morpheme in self.morphemes if morpheme != STEM)
+
+    def __len__(self):
+        return len(self.morphemes) - 1
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
+    def __hash__(self):
+        return self._hash
+
 class Analysis:
     def __init__(self, analysis, vocabularies):
         """ Split the morphemes from the output of the analyzer """
@@ -55,11 +88,11 @@ class Analysis:
         morphs = analysis.split('+')
         morphs = (morph for morph in morphs if morph)
         self.oov = False
-        self.morphemes = []
         self.stem = None
+        morphemes = []
         for morph in morphs:
             if morphRE.search(morph): # non-stem
-                self.morphemes.append(vocabularies['morpheme'][morph])
+                morphemes.append(vocabularies['morpheme'][morph])
             else: # stem
                 try:
                     if self.stem is not None:
@@ -68,36 +101,14 @@ class Analysis:
                 except OOV:
                     self.stem = morph # do not encode
                     self.oov = True
-                self.morphemes.append(STEM)
+                morphemes.append(STEM)
         if self.stem is None:
             raise AnalysisError(analysis)
-
-    def split(self):
-        if not hasattr(self, '_right'):
-            stem_index = self.morphemes.index(STEM)
-            self._left = self.morphemes[stem_index-1::-1] # self.morphemes[:stem_index]
-            self._right = self.morphemes[stem_index+1:]
+        self.pattern = MorphemePattern(morphemes)
 
     def decode_stem(self, vocabulary):
         if self.oov: return self.stem
         return vocabulary[self.stem]
-
-    @property
-    def non_stem_morphemes(self):
-        return (morpheme for morpheme in self.morphemes if morpheme != STEM)
-
-    @property
-    def right_morphemes(self):
-        self.split()
-        return self._right
-
-    @property
-    def left_morphemes(self):
-        self.split()
-        return self._left
-
-    def __len__(self):
-        return len(self.morphemes) - 1
 
 class Corpus:
     def __init__(self, sentences):

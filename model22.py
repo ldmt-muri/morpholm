@@ -29,16 +29,16 @@ class Model22(Model):
 
     def common_prob(self, analysis):
         # p(morphemes)
-        p_left = sum(self.model_left[x, y] for x, y in bigrams(analysis.left_morphemes))
-        p_right = sum(self.model_right[x, y] for x, y in bigrams(analysis.right_morphemes))
+        p_left = sum(self.model_left[x, y] for x, y in bigrams(analysis.pattern.left_morphemes))
+        p_right = sum(self.model_right[x, y] for x, y in bigrams(analysis.pattern.right_morphemes))
         return p_left + p_right
 
     # E step counts
     def count(self, analysis, lp):
         self.count_stems[analysis.stem] = np.logaddexp(self.count_stems[analysis.stem], lp)
-        for x, y in bigrams(analysis.left_morphemes):
+        for x, y in bigrams(analysis.pattern.left_morphemes):
             self.count_left[x, y] = np.logaddexp(self.count_left[x, y], lp)
-        for x, y in bigrams(analysis.right_morphemes):
+        for x, y in bigrams(analysis.pattern.right_morphemes):
             self.count_right[x, y] = np.logaddexp(self.count_right[x, y], lp)
 
     # M step

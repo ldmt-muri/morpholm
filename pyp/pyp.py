@@ -52,11 +52,9 @@ class PYP:
                     del tables[t]
                     self.ntables -= 1
                     self.base.decrement(k)
-                    """
-                    if len(tables) == 0: # cleanup dish (useless: dish will be re-incremented)
+                    if len(tables) == 0: # cleanup dish
                         del self.tables[k]
                         del self.ncustomers[k]
-                    """
                 break
             i -= tables[t]
     

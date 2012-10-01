@@ -20,7 +20,6 @@ def main():
     parser.add_argument('--sampler', help='use Gibbs sampling instead of EM', action='store_true')
     args = parser.parse_args()
 
-    fsm = FSM(args.fst)
     char_lm = CharLM(args.charlm)
 
     """
@@ -36,6 +35,7 @@ def main():
     """
 
     if args.fst:
+        fsm = FSM(args.fst)
         print('Training Model: {0}'.format(MODELS[args.model]))
         # Train
         with open(args.train) as train:

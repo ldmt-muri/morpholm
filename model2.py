@@ -47,12 +47,12 @@ class Model2(Model):
 
     def common_prob(self, analysis):
         # p(morphemes)
-        return sum(self.model_morphemes[x, y] for x, y in bigrams(analysis.morphemes))
+        return sum(self.model_morphemes[x, y] for x, y in bigrams(analysis.pattern.morphemes))
 
     # E step counts
     def count(self, analysis, lp):
         self.count_stems[analysis.stem] = np.logaddexp(self.count_stems[analysis.stem], lp)
-        for x, y in bigrams(analysis.morphemes):
+        for x, y in bigrams(analysis.pattern.morphemes):
             self.count_morphemes[x, y] = np.logaddexp(self.count_morphemes[x, y], lp)
 
     # M step
