@@ -56,13 +56,16 @@ class DirichletMultinomial:
         self.count[k] -= 1
         self.N -= 1
 
-    def pred_weight(self, k):
-        assert (0 <= k < self.K)
-        return math.log(self.alpha + self.count[k])
-
     def prob(self, k):
+        # = self.weight(k) + self.gamma_factor(1)
+        assert k >= 0
         if k > self.K: return -np.inf
         return math.log((self.alpha + self.count[k])/(self.K * self.alpha + self.N))
+
+    def weight(self, k):
+        assert k >= 0
+        if k > self.K: return -np.inf
+        return math.log((self.alpha + self.count[k]))
 
     def gamma_factor(self, n):
         if n == 0: return 0
@@ -87,13 +90,12 @@ class GammaPoisson:
         self.L -= l
         self.N -= 1
 
-    def pred_weight(self, l):
-        return (math.lgamma(l + self.L + self.alpha) - math.lgamma(self.L + self.alpha)
-                - math.lgamma(l + 1) - l * math.log(self.N + self.beta + 1))
-
     def prob(self, l):
-        _lambda = (self.L + self.alpha) / (self.N + self.beta)
-        return (-_lambda + l * math.log(_lambda) - math.lgamma(l + 1))
+        return (math.lgamma(l + self.L + self.alpha)
+                - math.lgamma(self.L + self.alpha) - math.lgamma(l + 1)
+                + (self.L + self.alpha) *
+                math.log((self.N + self.beta)/(self.N + self.beta + 1))
+                - l * math.log(self.N + self.beta + 1))
 
     def __str__(self):
         return 'Poisson(L={self.L}, N={self.N}) ~ Gamma({self.alpha}, {self.beta})'.format(self=self)

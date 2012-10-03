@@ -19,13 +19,9 @@ class PoissonUnigram:
             self.morpheme_model.decrement(morpheme)
         self.length_model.decrement(len(pattern))
 
-    def pred_weight(self, pattern):
-        return (sum(map(self.morpheme_model.pred_weight, pattern)) +
-                self.morpheme_model.gamma_factor(len(pattern)) +
-                self.length_model.pred_weight(len(pattern)))
-
     def prob(self, pattern):
-        return (sum(map(self.morpheme_model.prob, pattern)) +
+        return (sum(map(self.morpheme_model.weight, pattern)) +
+                self.morpheme_model.gamma_factor(len(pattern)) +
                 self.length_model.prob(len(pattern)))
 
     def __str__(self):
@@ -55,10 +51,6 @@ class Bigram:
     def decrement(self, pattern):
         for x, y in self._bigrams(pattern):
             self.morpheme_models[x].decrement(y)
-    
-    def pred_weight(self, pattern):
-        return sum(self.morpheme_models[x].prob(y) + self.morpheme_models[x].gamma_factor(1)
-                for x, y in self._bigrams(pattern))
 
     def prob(self, pattern):
         return sum(self.morpheme_models[x].prob(y) for x, y in self._bigrams(pattern))
@@ -76,7 +68,7 @@ class MorphoProcess:
     def increment(self, k):
         # Sample analysis & store assignment
         i = (0 if len(self.analyses[k]) == 1 else
-                mult_sample((i, math.exp(self.pred_weight(analysis)))
+                mult_sample((i, math.exp(self.analysis_prob(analysis)))
                     for i, analysis in enumerate(self.analyses[k])))
         self.assignments[k].append(i)
         analysis = self.analyses[k][i]
@@ -90,10 +82,6 @@ class MorphoProcess:
         # Decrement models
         self.stem_model.decrement(analysis.stem)
         self.morpheme_model.decrement(analysis.pattern)
-
-    def pred_weight(self, analysis):
-        return (self.stem_model.pred_weight(analysis.stem) +
-                self.morpheme_model.pred_weight(analysis.pattern))
 
     def analysis_prob(self, analysis):
         return (self.stem_model.prob(analysis.stem) +
@@ -118,7 +106,7 @@ class TopicModel:
         self.assignments = defaultdict(list)
 
     def increment(self, doc, word):
-        z = mult_sample((k, math.exp(self.pred_weight(doc, word, k)))
+        z = mult_sample((k, math.exp(self.topic_prob(doc, word, k)))
                 for k in xrange(self.Ntopics))
         self.assignments[doc, word].append(z)
         self.document_topic[doc].increment(z)
@@ -128,9 +116,6 @@ class TopicModel:
         z = remove_random(self.assignments[doc, word])
         self.document_topic[doc].decrement(z)
         self.topic_word[z].decrement(word)
-
-    def pred_weight(self, doc, word, k):
-        return self.topic_prob(doc, word, k)
 
     def topic_prob(self, doc, word, k):
         return self.document_topic[doc].prob(k) + self.topic_word[k].prob(word)

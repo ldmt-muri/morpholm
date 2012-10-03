@@ -2,7 +2,7 @@ import math
 import random
 from prob import mult_sample
 
-class PYP:
+class PYP(object):
     def __init__(self, theta, d, base):
         self.theta = theta
         self.d = d
@@ -65,13 +65,10 @@ class PYP:
         if k in self.tables:
             w += self.ncustomers[k] - self.d * len(self.tables[k])
         return math.log(w / (self.theta + self.total_customers))
-    
-    def pred_weight(self, k):
-        return self.prob(k) # TODO: check
 
     def log_likelihood(self):
         return sum(count * self.prob(k)
                 for k, count in self.ncustomers.iteritems())
 
     def __str__(self):
-        return 'PYPLM(d={self.d}, theta={self.theta}, #customers={self.total_customers}, #tables={self.ntables}, #dishes={V}, Base={self.base})'.format(self=self, V=len(self.tables))
+        return 'PYP(d={self.d}, theta={self.theta}, #customers={self.total_customers}, #tables={self.ntables}, #dishes={V}, Base={self.base})'.format(self=self, V=len(self.tables))

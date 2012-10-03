@@ -2,7 +2,7 @@ import logging
 import argparse
 import math
 from corpus import FSM, Vocabulary, analyze_corpus, encode_corpus, init_vocabularies
-from prob import CharLM #, DirichletMultinomial, FixedMixModel
+from prob import CharLM #, DirichletMultinomial
 from pyp import PYP
 from model import MorphoProcess, Bigram #, PoissonUnigram
 
@@ -40,7 +40,8 @@ def main():
     parser.add_argument('--test', help='evaluation corpus', required=True)
     parser.add_argument('--fst', help='compiled morphoanalyzer')
     parser.add_argument('--charlm', help='character language model (KenLM format)', required=True)
-    parser.add_argument('-i', '--iter', help='number of iterations', required=True, type=int)
+    parser.add_argument('-i', '--iterations', help='number of iterations', required=True, type=int)
+    parser.add_argument('--pyp', help='top model is PYP(p0=MP) instead of MP', action='store_true') 
     args = parser.parse_args()
 
     char_lm = CharLM(args.charlm)
@@ -70,22 +71,18 @@ def main():
         assert len(word_analyses) == n_words
 
         char_lm.vocabulary = vocabularies['stem']
-        #mp = MorphoProcess(DirichletMultinomial(n_stems, alpha), PoissonUnigram(n_morphemes, beta, gamma, delta), word_analyses)
+
         #mp = MorphoProcess(PYP(alpha, p, char_lm), PoissonUnigram(n_morphemes, beta, gamma, delta), word_analyses)
         #mp = MorphoProcess(PYP(alpha, p, char_lm), Bigram(n_morphemes, beta), word_analyses)
         mp = MorphoProcess(PYP(alpha, p, char_lm), PYP(alpha, p, Bigram(n_morphemes, beta)), word_analyses)
 
-        model = PYP(theta, d, mp)
-        #model = mp
+        if args.pyp:
+            model = PYP(theta, d, mp)
+        else:
+            model = mp
 
         logging.info('Training model')
         run_sampler(model, training_corpus, args.iterations)
-
-        """
-        # Make mixture (if mp = MP(DirMult, *))
-        p_char = 0.0303856942301
-        mp.stem_model = FixedMixModel([mp.stem_model, char_lm], [1-p_char, p_char])
-        """
 
         logging.info('Computing test corpus perplexity')
         with open(args.test) as test:

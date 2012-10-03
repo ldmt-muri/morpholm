@@ -74,12 +74,13 @@ class Model1(Model):
         L, N = self.count_length
         l = len(analysis.pattern)
         # length
-        # ss.nbinom.pmf(l, L + self.gamma, (N + self.delta)/(N + self.delta + 1))
+        # NB(L+g, 1/(N+d+1)) ?
+        # = ss.nbinom.pmf(l, L + self.gamma, (N + self.delta)/(N + self.delta + 1))
         # = math.exp(math.lgamma(l + L + self.gamma)
         #            - math.lgamma(L + self.gamma)
-        #            - math.lgamma(l + 1))
+        #            - math.lgamma(l + 1)
         #            + (L + self.gamma) * math.log((N + self.delta)/(N + self.delta + 1)) # const
-        #            - l * math.log(N + self.delta + 1)
+        #            - l * math.log(N + self.delta + 1))
         w = math.exp(math.lgamma(l + L + self.gamma) - math.lgamma(L + self.gamma)
                 - math.lgamma(l + 1) - l * math.log(N + self.delta + 1))
         # stem
