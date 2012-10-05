@@ -19,6 +19,7 @@ def remove_random(assignments):
     return assignment
 
 LOG10 = math.log(10)
+SPECIAL = set(('<s>', '</s>'))
 
 class CharLM(kenlm.LanguageModel):
     def increment(self, k): pass
@@ -26,7 +27,9 @@ class CharLM(kenlm.LanguageModel):
     def decrement(self, k): pass
 
     def prob(self, k):
-        return self.score(' '.join(self.vocabulary[k]))*LOG10
+        word = self.vocabulary[k]
+        if word in SPECIAL: return 0
+        return self.score(' '.join(word))*LOG10
 
     def __str__(self):
         return 'CharLM(n={self.order})'.format(self=self)
@@ -76,6 +79,11 @@ class DirichletMultinomial:
     def __str__(self):
         return 'Multinomial(K={self.K}, N={self.N}) ~ Dir({self.alpha})'.format(self=self)
 
+def log_binomial_coeff(k, n):
+    if k == 0: return 0
+    if k == 1: return math.log(n)
+    return math.lgamma(n + 1) - math.lgamma(k + 1) - math.lgamma(n - k + 1)
+
 class GammaPoisson:
     def __init__(self, alpha, beta):
         self.alpha = alpha
@@ -91,11 +99,9 @@ class GammaPoisson:
         self.N -= 1
 
     def prob(self, l):
-        return (math.lgamma(l + self.L + self.alpha)
-                - math.lgamma(self.L + self.alpha) - math.lgamma(l + 1)
-                + (self.L + self.alpha) *
-                math.log((self.N + self.beta)/(self.N + self.beta + 1))
-                - l * math.log(self.N + self.beta + 1))
+        r = self.L + self.alpha
+        p = 1 / (self.N + self.beta + 1)
+        return log_binomial_coeff(l, l + r - 1) + r * math.log(1 - p) + l * math.log(p)
 
     def __str__(self):
         return 'Poisson(L={self.L}, N={self.N}) ~ Gamma({self.alpha}, {self.beta})'.format(self=self)

@@ -1,3 +1,5 @@
+from collections import deque
+from itertools import chain, repeat
 import unicodedata
 import sys
 import re
@@ -28,10 +30,13 @@ class FSM:
         return {word}
 
 class Vocabulary:
-    def __init__(self):
+    def __init__(self, *init):
         self.word2id = {}
         self.id2word = []
         self.frozen = False
+        for w in init:
+            self.word2id[w] = len(self)
+            self.id2word.append(w)
 
     def __getitem__(self, word):
         if isinstance(word, int):
@@ -122,8 +127,8 @@ class Corpus:
     def __len__(self):
         return sum(len(sentence) for sentence in self.sentences)
 
-def init_vocabularies():
-    vocabularies = {'word': Vocabulary(),
+def init_vocabularies(*init):
+    vocabularies = {'word': Vocabulary(*init),
                     'morpheme': Vocabulary(),
                     'stem': Vocabulary()}
     assert (vocabularies['morpheme']['stem'] == STEM)
@@ -142,9 +147,7 @@ def analyze_corpus(stream, fsm, vocabularies, word_analyses):
             N += 1
             w = vocabularies['word'][word]
             try:
-                if w in word_analyses:
-                    analyses = word_analyses[w]
-                else:
+                if not w in word_analyses:
                     analyses = fsm.get_analyses(word)
                     analyses = [Analysis(analysis, vocabularies) for analysis in analyses]
                     word_analyses[w] = analyses
@@ -158,3 +161,17 @@ def analyze_corpus(stream, fsm, vocabularies, word_analyses):
 def encode_corpus(stream, vocabulary):
     return Corpus([[vocabulary[word] for word in sentence.decode('utf8').split()]
                         for sentence in stream])
+
+START = 0
+STOP = 1
+def ngrams(sentence, order):
+    if order == 1:
+        for w in sentence:
+            yield (w,)
+        return
+    s = chain(repeat(START, order-1), sentence, (STOP,))
+    ngram = deque(maxlen=order)
+    for w in s:
+        ngram.append(w)
+        if len(ngram) == order:
+            yield tuple(ngram)
