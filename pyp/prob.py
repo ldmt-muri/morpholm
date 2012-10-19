@@ -1,3 +1,4 @@
+import os
 import math
 import numpy as np
 import random
@@ -22,6 +23,10 @@ LOG10 = math.log(10)
 SPECIAL = set(('<s>', '</s>'))
 
 class CharLM(kenlm.LanguageModel):
+    def __init__(self, path):
+        super(CharLM, self).__init__(path)
+        self.path = os.path.abspath(path)
+
     def increment(self, k): pass
 
     def decrement(self, k): pass
@@ -31,8 +36,11 @@ class CharLM(kenlm.LanguageModel):
         if word in SPECIAL: return 0
         return self.score(' '.join(word))*LOG10
 
-    def __str__(self):
+    def __repr__(self):
         return 'CharLM(n={self.order})'.format(self=self)
+
+    def __reduce__(self):
+        return (CharLM, (self.path,))
 
 class FixedMixModel:
     def __init__(self, models, coeffs):
@@ -76,7 +84,7 @@ class DirichletMultinomial:
         return (math.lgamma(self.K * self.alpha + self.N)
                 - math.lgamma(self.K * self.alpha + self.N + n))
 
-    def __str__(self):
+    def __repr__(self):
         return 'Multinomial(K={self.K}, N={self.N}) ~ Dir({self.alpha})'.format(self=self)
 
 def log_binomial_coeff(k, n):
@@ -103,7 +111,7 @@ class GammaPoisson:
         p = 1 / (self.N + self.beta + 1)
         return log_binomial_coeff(l, l + r - 1) + r * math.log(1 - p) + l * math.log(p)
 
-    def __str__(self):
+    def __repr__(self):
         return 'Poisson(L={self.L}, N={self.N}) ~ Gamma({self.alpha}, {self.beta})'.format(self=self)
 
 class Uniform:

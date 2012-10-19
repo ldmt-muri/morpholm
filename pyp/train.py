@@ -1,16 +1,24 @@
 import logging
 import argparse
 import math
+import cPickle
 from corpus import FSM, Vocabulary, analyze_corpus, encode_corpus, init_vocabularies
-from prob import CharLM #, DirichletMultinomial
+from prob import CharLM
 from pyp import PYP
-from model import MorphoProcess, Bigram #, PoissonUnigram
+from model import MorphoProcess, PoissonUnigram, Bigram
 
+# Main PYP
 theta = 1.0
 d = 0.8
+# Stem PYP
 alpha = 1.0
 p = 0.8
+# Pattern PYP
+nu = 1.0
+q = 0.8
+# Morpheme prior
 beta = 1.0
+# Length prior
 gamma = 1.0
 delta = 1.0
 
@@ -40,8 +48,12 @@ def main():
     parser.add_argument('--test', help='evaluation corpus', required=True)
     parser.add_argument('--fst', help='compiled morphoanalyzer')
     parser.add_argument('--charlm', help='character language model (KenLM format)', required=True)
-    parser.add_argument('-i', '--iterations', help='number of iterations', required=True, type=int)
     parser.add_argument('--pyp', help='top model is PYP(p0=MP) instead of MP', action='store_true') 
+    parser.add_argument('--backend', help='analyzer type (foma/xfst/pymorphy)', default='foma')
+    parser.add_argument('--model', help='type of model to train (1/2/3)', type=int, default=3)
+    parser.add_argument('--notrust', help='do not trust analyzer and also keep non-analyzed word', action='store_true')
+    parser.add_argument('-i', '--iterations', help='number of iterations', required=True, type=int)
+    parser.add_argument('--output', '-o', help='model output path')
     args = parser.parse_args()
 
     char_lm = CharLM(args.charlm)
@@ -50,7 +62,7 @@ def main():
         logging.info('Training full system')
         vocabularies = init_vocabularies()
         word_analyses = {}
-        fsm = FSM(args.fst)
+        fsm = FSM(args.fst, args.backend, not args.notrust)
 
         logging.info('Analyzing training corpus')
         with open(args.train) as train:
@@ -72,9 +84,12 @@ def main():
 
         char_lm.vocabulary = vocabularies['stem']
 
-        #mp = MorphoProcess(PYP(alpha, p, char_lm), PoissonUnigram(n_morphemes, beta, gamma, delta), word_analyses)
-        #mp = MorphoProcess(PYP(alpha, p, char_lm), Bigram(n_morphemes, beta), word_analyses)
-        mp = MorphoProcess(PYP(alpha, p, char_lm), PYP(alpha, p, Bigram(n_morphemes, beta)), word_analyses)
+        if args.model == 1:
+            mp = MorphoProcess(PYP(alpha, p, char_lm), PoissonUnigram(n_morphemes, beta, gamma, delta), word_analyses)
+        elif args.model == 2:
+            mp = MorphoProcess(PYP(alpha, p, char_lm), Bigram(n_morphemes, beta), word_analyses)
+        elif args.model == 3:
+            mp = MorphoProcess(PYP(alpha, p, char_lm), PYP(nu, q, Bigram(n_morphemes, beta)), word_analyses)
 
         if args.pyp:
             model = PYP(theta, d, mp)
@@ -84,12 +99,17 @@ def main():
         logging.info('Training model')
         run_sampler(model, training_corpus, args.iterations)
 
+        if args.output:
+            logging.info('Saving model')
+            data = {'model': model, 'vocabularies': vocabularies, 'analyses': word_analyses}
+            with open(args.output, 'w') as output:
+                cPickle.dump(data, output, protocol=-1)
+
         logging.info('Computing test corpus perplexity')
         with open(args.test) as test:
             test_corpus = analyze_corpus(test, fsm, vocabularies, word_analyses)
 
         print_ppl(model, test_corpus)
-
     else:
         logging.info('Training baseline system')
         vocabulary = Vocabulary()

@@ -24,7 +24,7 @@ class PoissonUnigram:
                 self.morpheme_model.gamma_factor(len(pattern)) +
                 self.length_model.prob(len(pattern)))
 
-    def __str__(self):
+    def __repr__(self):
         return 'PoissonUnigram(length ~ {self.length_model}, morph ~ {self.morpheme_model})'.format(self=self)
 
 class Bigram:
@@ -55,7 +55,7 @@ class Bigram:
     def prob(self, pattern):
         return sum(self.morpheme_models[x].prob(y) for x, y in self._bigrams(pattern))
 
-    def __str__(self):
+    def __repr__(self):
         return 'Bigram(stem\'|stem ~ Mult ~ Dir)'
 
 class MorphoProcess:
@@ -91,11 +91,16 @@ class MorphoProcess:
         return np.logaddexp.reduce([self.analysis_prob(analysis)
             for analysis in self.analyses[k]])
 
+    def decode(self, k):
+        return max((self.analysis_prob(analysis), analysis)
+            for analysis in self.analyses[k])
+
     def log_likelihood(self):
+        # XXX pseudo log-likelihood
         return sum(self.prob(k) * len(assignments)
                 for k, assignments in self.assignments.iteritems())
 
-    def __str__(self):
+    def __repr__(self):
         return 'MorphoProcess(#words={N} | stem ~ {self.stem_model}, morphemes ~ {self.morpheme_model})'.format(self=self, N=sum(map(len, self.assignments.itervalues())))
 
 class TopicModel:
@@ -125,8 +130,9 @@ class TopicModel:
             for k in xrange(self.Ntopics)])
 
     def log_likelihood(self):
+        # XXX pseudo log-likelihood
         return sum(self.prob(doc, word) * len(assignments)
                 for (doc, word), assignments in self.assignments.iteritems())
 
-    def __str__(self):
+    def __repr__(self):
         return 'TopicModel(#topics={self.Ntopics})'.format(self=self)

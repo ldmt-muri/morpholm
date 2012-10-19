@@ -1,10 +1,10 @@
 import sys
 import cPickle
-from model1 import Model1
-#from model2 import Model2
+#from model1 import Model1
+from model2 import Model2
 #from model22 import Model22
 
-Niter = 10
+Niter = 5
 def train_model(Model, corpus, vocabularies, sampler=False):
     n_morphemes = len(vocabularies['morpheme'])
     n_stems = len(vocabularies['stem'])
@@ -22,7 +22,7 @@ def main(vocab_file, corpus_file, out):
         vocabularies = cPickle.load(fp)
     with open(corpus_file) as fp:
         corpus = cPickle.load(fp)
-    model = train_model(Model1, corpus, vocabularies, True)
+    model = train_model(Model2, corpus, vocabularies, False)
     with open(out, 'w') as fp:
         cPickle.dump(model, fp, protocol=2)
 

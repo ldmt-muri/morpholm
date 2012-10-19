@@ -70,7 +70,8 @@ class Model:
                 for analysis, lp in izip(analyses, probs):
                     self.count(analysis, lp-norm)
                 #self.count_words += 1
-            print(' Log likelihood: {0}'.format(loglik))
+            ppl = math.exp(-loglik/len(corpus))
+            print(' Log likelihood: {0} / ppl: {1}'.format(loglik, ppl))
             # Maximization
             self.maximization()
         self.cleanup()
@@ -88,7 +89,8 @@ class Model:
             self.map_estimate()
             loglik = sum(marginalize(map(self.stem_prob, corpus.analyses[word]))
                     for word in corpus)
-            print(' Log likelihood: {0}'.format(loglik))
+            ppl = math.exp(-loglik/len(corpus))
+            print(' Log likelihood: {0} / ppl: {1}'.format(loglik, ppl))
         self.cleanup()
 
     def sample(self, analyses):

@@ -36,7 +36,7 @@ def tune_model(vocabularies, model, char_lm, fsm, dev_corpus):
             cp = np.logaddexp.reduce(char_probs)
             corpus_probs.append((sp, cp))
 
-    print('Optimizing...')
+    print('Optimizing ({0} words)...'.format(len(corpus_probs)))
     model.model_char = 0.5
     Niter = 10
     for it in range(Niter):

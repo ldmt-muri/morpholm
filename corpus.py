@@ -2,31 +2,71 @@ from collections import deque
 from itertools import chain, repeat
 import unicodedata
 import sys
+import logging
 import re
-import foma
+
+# Try loading analyzers
+try:
+    import foma
+except ImportError:
+    logging.info('foma backend not available')
+try:
+    import xfst
+except ImportError:
+    logging.info('xfst backend not available')
+try:
+    import pymorphy
+except ImportError:
+    logging.info('pymorphy backend not available')
 
 strip_accents = lambda s: ''.join(c for c in unicodedata.normalize('NFD', s) 
         if unicodedata.category(c) != 'Mn')
 
-wRE = re.compile('^[a-z]+$')
+#wRE = re.compile('^[a-z]+$')
+wRE = re.compile('^[^\W\d_]+$', re.UNICODE)
 morphRE = re.compile('[A-Z]')
 STEM = 0
 
 class OOV(Exception): pass
 class AnalysisError(Exception): pass
 
+info2morph = lambda info: '+'.join(m.title() for m in info.split(',') if m)
+class_map = {
+'-': 'UNK', # Errors
+'S': 'N', # Noun
+'A': 'J', # Adjective
+'V': 'V', # Verb
+'PR': 'PR', # Preposition
+'CONJ': 'CONJ', # Conjunction
+'ADV': 'ADV' # Adverb
+}
+
+class PyMorphy:
+    def __init__(self, db):
+        self.analyzer = pymorphy.get_morph(db)
+
+    def apply_up(self, word):
+        return [(analysis['norm'].lower()
+            +'+'+class_map[analysis['class']]
+            +'+'+info2morph(analysis['info']))
+            for analysis in self.analyzer.get_graminfo(word.upper(), standard=True)]
+
 class FSM:
-    def __init__(self, fsm):
-        self.fsm = foma.read_binary(fsm)
+    def __init__(self, fsm, backend='foma', trust=True):
+        self.fsm = (PyMorphy(fsm) if backend == 'pymorphy' else
+                (xfst if backend == 'xfst' else foma).read_binary(fsm))
+        self.trust = True
 
     def get_analyses(self, word):
         if '+' in word:
             word = word.replace('+', '#')
-        word = strip_accents(word)
+        #word = strip_accents(word)
         if len(word) > 3 and wRE.match(word):
             analyses = set(self.fsm.apply_up(word))
-            if not analyses: return {word}
-            return analyses
+            if self.trust:
+                return {word} if not analyses else analyses
+            else:
+                return analyses | {word}
         return {word}
 
 class Vocabulary:
@@ -115,6 +155,15 @@ class Analysis:
         if self.oov: return self.stem
         return vocabulary[self.stem]
 
+    def decode(self, vocabularies):
+        def m():
+            for morph in self.pattern.morphemes:
+                if morph == STEM:
+                    yield self.decode_stem(vocabularies['stem'])
+                else:
+                    yield vocabularies['morpheme'][morph]
+        return '+'.join(m())
+
 class Corpus:
     def __init__(self, sentences):
         self.sentences = sentences
@@ -153,7 +202,8 @@ def analyze_corpus(stream, fsm, vocabularies, word_analyses):
                     word_analyses[w] = analyses
                 words.append(w)
             except AnalysisError as analysis:
-                print('Analyzis error for {0}: {1}'.format(word, analysis))
+                print(u'Analysis error for {0}: {1}'.format(word, analysis))
+                word_analyses[w] = [Analysis(word, vocabularies)]
         sentences.append(words)
     sys.stderr.write(' done\n')
     return Corpus(sentences)

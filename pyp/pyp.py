@@ -77,11 +77,18 @@ class PYP(CRP):
         return math.log(w / (self.theta + self.total_customers))
 
     def log_likelihood(self):
-        # XXX this is the leave-one-out log likelihood, not log p(X|d,t) 
+        # XXX pseudo log-likelihood
         return sum(count * self.prob(k)
                 for k, count in self.ncustomers.iteritems())
 
-    def __str__(self):
+    def decode(self, k):
+        p0, dec = self.base.decode(k)
+        w = (self.theta + self.d * self.ntables) * math.exp(p0)
+        if k in self.tables:
+            w += self.ncustomers[k] - self.d * len(self.tables[k])
+        return math.log(w / (self.theta + self.total_customers)), dec
+
+    def __repr__(self):
         return 'PYP(d={self.d}, theta={self.theta}, #customers={self.total_customers}, #tables={self.ntables}, #dishes={V}, Base={self.base})'.format(self=self, V=len(self.tables))
 
 class BackoffBase:
@@ -129,5 +136,5 @@ class PYPLM:
     def log_likelihood(self):
         return sum(m.log_likelihood() for m in self.models.itervalues())
 
-    def __str__(self):
+    def __repr__(self):
         return 'PYPLM(d={self.d}, theta={self.theta}, #ctx={C}, backoff={self.backoff})'.format(self=self, C=len(self.models))
