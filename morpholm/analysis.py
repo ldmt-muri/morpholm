@@ -1,33 +1,29 @@
-from collections import deque
-from itertools import chain, repeat
-import unicodedata
 import sys
 import logging
 import re
+import corpus
+
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+logger = logging.getLogger(__name__)
 
 # Try loading analyzers
 try:
     import foma
 except ImportError:
-    logging.info('foma backend not available')
+    logger.info('foma backend not available')
 try:
     import xfst
 except ImportError:
-    logging.info('xfst backend not available')
+    logger.info('xfst backend not available')
 try:
     import pymorphy
 except ImportError:
-    logging.info('pymorphy backend not available')
+    logger.info('pymorphy backend not available')
 
-strip_accents = lambda s: ''.join(c for c in unicodedata.normalize('NFD', s) 
-        if unicodedata.category(c) != 'Mn')
 
-#wRE = re.compile('^[a-z]+$')
 wRE = re.compile('^[^\W\d_]+$', re.UNICODE)
 morphRE = re.compile('[A-Z]')
 STEM = 0
-
-class OOV(Exception): pass
 class AnalysisError(Exception): pass
 
 info2morph = lambda info: '+'.join(m.title() for m in info.split(',') if m)
@@ -51,45 +47,22 @@ class PyMorphy:
             +'+'+info2morph(analysis['info']))
             for analysis in self.analyzer.get_graminfo(word.upper(), standard=True)]
 
-class FSM:
+class Analyzer:
     def __init__(self, fsm, backend='foma', trust=True):
         self.fsm = (PyMorphy(fsm) if backend == 'pymorphy' else
                 (xfst if backend == 'xfst' else foma).read_binary(fsm))
-        self.trust = True
+        self.trust = trust
 
     def get_analyses(self, word):
         if '+' in word:
             word = word.replace('+', '#')
-        #word = strip_accents(word)
         if len(word) > 3 and wRE.match(word):
             analyses = set(self.fsm.apply_up(word))
-            if self.trust:
-                return {word} if not analyses else analyses
-            else:
+            if self.trust: # always try to analyze
+                return analyses or {word}
+            else: # keep unanalyzed version even if analysis is possible
                 return analyses | {word}
         return {word}
-
-class Vocabulary:
-    def __init__(self, *init):
-        self.word2id = {}
-        self.id2word = []
-        self.frozen = False
-        for w in init:
-            self.word2id[w] = len(self)
-            self.id2word.append(w)
-
-    def __getitem__(self, word):
-        if isinstance(word, int):
-            assert word >= 0
-            return self.id2word[word]
-        if word not in self.word2id:
-            if self.frozen: raise OOV(word)
-            self.word2id[word] = len(self)
-            self.id2word.append(word)
-        return self.word2id[word]
-
-    def __len__(self):
-        return len(self.id2word)
 
 analysis_fix = re.compile('A\+(\d)')
 
@@ -132,28 +105,19 @@ class Analysis:
         analysis = analysis_fix.sub(r'a+\1', analysis) # ??????????????
         morphs = analysis.split('+')
         morphs = (morph for morph in morphs if morph)
-        self.oov = False
         self.stem = None
         morphemes = []
         for morph in morphs:
             if morphRE.search(morph): # non-stem
                 morphemes.append(vocabularies['morpheme'][morph])
             else: # stem
-                try:
-                    if self.stem is not None:
-                        raise AnalysisError(analysis)
-                    self.stem = vocabularies['stem'][morph]
-                except OOV:
-                    self.stem = morph # do not encode
-                    self.oov = True
+                if self.stem is not None:
+                    raise AnalysisError(analysis)
+                self.stem = vocabularies['stem'][morph]
                 morphemes.append(STEM)
         if self.stem is None:
             raise AnalysisError(analysis)
         self.pattern = MorphemePattern(morphemes)
-
-    def decode_stem(self, vocabulary):
-        if self.oov: return self.stem
-        return vocabulary[self.stem]
 
     def decode(self, vocabularies):
         def m():
@@ -163,25 +127,6 @@ class Analysis:
                 else:
                     yield vocabularies['morpheme'][morph]
         return '+'.join(m())
-
-class Corpus:
-    def __init__(self, sentences):
-        self.sentences = sentences
-
-    def __iter__(self):
-        for sentence in self.sentences:
-            for word in sentence:
-                yield word
-
-    def __len__(self):
-        return sum(len(sentence) for sentence in self.sentences)
-
-def init_vocabularies(*init):
-    vocabularies = {'word': Vocabulary(*init),
-                    'morpheme': Vocabulary(),
-                    'stem': Vocabulary()}
-    assert (vocabularies['morpheme']['stem'] == STEM)
-    return vocabularies
 
 def analyze_corpus(stream, fsm, vocabularies, word_analyses):
     sys.stderr.write('Reading corpus ')
@@ -206,22 +151,11 @@ def analyze_corpus(stream, fsm, vocabularies, word_analyses):
                 word_analyses[w] = [Analysis(word, vocabularies)]
         sentences.append(words)
     sys.stderr.write(' done\n')
-    return Corpus(sentences)
+    return corpus.Corpus(sentences)
 
-def encode_corpus(stream, vocabulary):
-    return Corpus([[vocabulary[word] for word in sentence.decode('utf8').split()]
-                        for sentence in stream])
-
-START = 0
-STOP = 1
-def ngrams(sentence, order):
-    if order == 1:
-        for w in sentence:
-            yield (w,)
-        return
-    s = chain(repeat(START, order-1), sentence, (STOP,))
-    ngram = deque(maxlen=order)
-    for w in s:
-        ngram.append(w)
-        if len(ngram) == order:
-            yield tuple(ngram)
+def init_vocabularies(*init):
+    vocabularies = {'word': corpus.Vocabulary(*init),
+                    'morpheme': corpus.Vocabulary(),
+                    'stem': corpus.Vocabulary()}
+    assert (vocabularies['morpheme']['stem'] == STEM)
+    return vocabularies

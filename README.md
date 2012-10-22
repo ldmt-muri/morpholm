@@ -2,32 +2,27 @@
 
 ## Requirements
 
-- Python 2.7 is required
-- Install numpy
-- Install the [foma module](https://github.com/vchahun/foma).
-- Install the [KenLM module](https://github.com/vchahun/kenlm#python-module)
+- Python 2.7
+- numpy
+- [foma module](https://github.com/vchahun/foma).
+- [KenLM module](https://github.com/vchahun/kenlm#python-module)
 
-## Combined training + evaluation
-
-To run Unigram Model 2 (~20m & 1G on the Global Voices data):
-
-    python full.py --train training-corpus.txt --dev dev-corpus.txt --test test-corpus.txt\
-        --fst analyzer.fst --charlm charlm.klm --model 2
-
-## Training a model step by step
+## Training a model
 
 - Analyze the training corpus:
 
-        python analyze_corpus.py analyzer.fst vocab.pickle corpus.pickle < training-corpus.txt
+    python morpholm/analyze.py --fst analyzer.fst --output train-corpus.pickle < train-corpus.txt
 
-- Train a model:
+- Train the model:
 
-        python em.py vocab.pickle corpus.pickle model1.pickle
+    python morpholm/train.py -i 10 --train train-corpus.pickle --charlm charlm.klm --output model.pickle
 
-- Tune the CharLM/MorphLM interpolation parameter:
+- Evaluate the model by computing the test set perplexity:
 
-        python tune.py vocab.pickle model1.pickle charlm.klm analyzer.fst < dev-corpus.txt
+    python morpholm/eval.py --fst analyzer.fst --model model.pickle --ppl < test-corpus.txt
 
-- Evaluate by computing the test set perplexity:
+## Using a model for decoding
 
-        python ppl.py vocab.pickle model1.pickle charlm.klm analyzer.fst < test-corpus.txt
+- Analyze data:
+
+    python morpholm/eval.py --fst analyzer.fst --model model.pickle --decode < test-corpus.txt > analyzed-corpus.txt

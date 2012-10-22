@@ -26,15 +26,21 @@ class CharLM(kenlm.LanguageModel):
     def __init__(self, path):
         super(CharLM, self).__init__(path)
         self.path = os.path.abspath(path)
+        self.counts = Counter()
 
-    def increment(self, k): pass
+    def increment(self, k):
+        self.counts[k] += 1
 
-    def decrement(self, k): pass
+    def decrement(self, k):
+        self.counts[k] -= 1
 
     def prob(self, k):
         word = self.vocabulary[k]
         if word in SPECIAL: return 0
         return self.score(' '.join(word))*LOG10
+
+    def log_likelihood(self):
+        return sum(self.prob(k) * c for k, c in self.counts.iteritems())
 
     def __repr__(self):
         return 'CharLM(n={self.order})'.format(self=self)
@@ -54,7 +60,7 @@ class DirichletMultinomial:
     def __init__(self, K, alpha):
         self.K = K
         self.alpha = alpha
-        self.count = Counter()
+        self.count = [0]*K
         self.N = 0
 
     def increment(self, k):
@@ -84,6 +90,11 @@ class DirichletMultinomial:
         return (math.lgamma(self.K * self.alpha + self.N)
                 - math.lgamma(self.K * self.alpha + self.N + n))
 
+    def log_likelihood(self):
+        return (math.lgamma(self.K * self.alpha) - math.lgamma(self.K * self.alpha + self.N)
+                + sum(math.lgamma(self.alpha + self.count[k]) for k in xrange(self.K))
+                - self.K * math.lgamma(self.alpha))
+
     def __repr__(self):
         return 'Multinomial(K={self.K}, N={self.N}) ~ Dir({self.alpha})'.format(self=self)
 
@@ -111,18 +122,26 @@ class GammaPoisson:
         p = 1 / (self.N + self.beta + 1)
         return log_binomial_coeff(l, l + r - 1) + r * math.log(1 - p) + l * math.log(p)
 
+    # TODO log_likelihood
+
     def __repr__(self):
         return 'Poisson(L={self.L}, N={self.N}) ~ Gamma({self.alpha}, {self.beta})'.format(self=self)
 
 class Uniform:
     def __init__(self, N):
         self.N = N
+        self.count = 0
         self.logN = math.log(N)
 
-    def increment(self, k): pass
+    def increment(self, k):
+        self.count += 1
 
-    def decrement(self, k): pass
+    def decrement(self, k):
+        self.count -= 1
 
     def prob(self, k):
         if k > self.N: return -np.inf
         return -self.logN
+
+    def log_likelihood(self):
+        return - self.count * self.logN

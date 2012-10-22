@@ -1,8 +1,8 @@
 import logging
 import argparse
 import math
-from corpus import FSM, Vocabulary, ngrams, Analysis,\
-        analyze_corpus, encode_corpus, init_vocabularies
+from corpus import Vocabulary, ngrams, encode_corpus
+from analysis import Analyzer, analyze_corpus, init_vocabularies, Analysis
 from prob import CharLM
 from pyp import PYP, PYPLM
 from model import MorphoProcess, Bigram
@@ -13,9 +13,9 @@ alpha = 1.0
 p = 0.8
 beta = 1.0
 
-def run_sampler(model, corpus, Niter):
-    for it in range(Niter):
-        logging.info('Iteration %d/%d', it+1, Niter)
+def run_sampler(model, corpus, n_iter):
+    for it in range(n_iter):
+        logging.info('Iteration %d/%d', it+1, n_iter)
         for sentence in corpus.sentences:
             for seq in ngrams(sentence, model.order):
                 if it > 0: model.decrement(seq)
@@ -55,7 +55,7 @@ def main():
         vocabularies = init_vocabularies('<s>', '</s>')
         word_analyses = {vocabularies['word']['<s>']: [Analysis('<s>', vocabularies)],
                          vocabularies['word']['</s>']: [Analysis('</s>', vocabularies)]}
-        fsm = FSM(args.fst)
+        fsm = Analyzer(args.fst)
 
         logging.info('Analyzing training corpus')
         with open(args.train) as train:
@@ -64,7 +64,7 @@ def main():
         n_words = len(vocabularies['word'])
         n_stems = len(vocabularies['stem'])
         n_morphemes = len(vocabularies['morpheme'])
-        n_analyses = sum(len(analyzes) for analyzes in word_analyses.itervalues())
+        n_analyses = sum(len(analyses) for analyses in word_analyses.itervalues())
         n_patterns = len(set(analysis.pattern for analyses in word_analyses.itervalues()
                              for analysis in analyses))
 

@@ -69,17 +69,26 @@ class PYP(CRP):
     
     def prob(self, k): # total prob for dish k
         # new table
-        w = ((self.theta + self.d * self.ntables)
-                * math.exp(self.base.prob(k)))
+        w = (self.theta + self.d * self.ntables) * math.exp(self.base.prob(k))
         # existing tables
         if k in self.tables:
             w += self.ncustomers[k] - self.d * len(self.tables[k])
         return math.log(w / (self.theta + self.total_customers))
 
-    def log_likelihood(self):
-        # XXX pseudo log-likelihood
+    def pseudo_log_likelihood(self):
         return sum(count * self.prob(k)
                 for k, count in self.ncustomers.iteritems())
+
+    def log_likelihood(self, base=True):
+        ll = (math.lgamma(self.theta) - math.lgamma(self.theta + self.total_customers)
+                + math.lgamma(self.theta / self.d + self.ntables)
+                - math.lgamma(self.theta / self.d)
+                + self.ntables * (math.log(self.d) - math.lgamma(1 - self.d))
+                + sum(math.lgamma(n - self.d) for tables in self.tables.itervalues()
+                    for n in tables))
+        if base:
+            ll += self.base.log_likelihood()
+        return ll
 
     def decode(self, k):
         p0, dec = self.base.decode(k)
@@ -115,10 +124,10 @@ class PYPLM:
 
     def __getitem__(self, ctx):
         if ctx not in self.models:
-            self.models[ctx] = self.get(ctx)
+            self.models[ctx] = self._get(ctx)
         return self.models[ctx]
 
-    def get(self, ctx):
+    def _get(self, ctx):
         if ctx not in self.models:
             base = (self.backoff if self.order == 1 else BackoffBase(self.backoff, ctx[1:]))
             return PYP(self.theta, self.d, base)
@@ -131,10 +140,11 @@ class PYPLM:
         self.models[k[:-1]].decrement(k[-1])
 
     def prob(self, k):
-        return self.get(k[:-1]).prob(k[-1])
+        return self._get(k[:-1]).prob(k[-1])
 
     def log_likelihood(self):
-        return sum(m.log_likelihood() for m in self.models.itervalues())
+        return (sum(m.log_likelihood(base=False) for m in self.models.itervalues())
+                + self.backoff.log_likelihood())
 
     def __repr__(self):
         return 'PYPLM(d={self.d}, theta={self.theta}, #ctx={C}, backoff={self.backoff})'.format(self=self, C=len(self.models))

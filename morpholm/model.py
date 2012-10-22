@@ -24,9 +24,14 @@ class PoissonUnigram:
                 self.morpheme_model.gamma_factor(len(pattern)) +
                 self.length_model.prob(len(pattern)))
 
+    def log_likelihood(self):
+        return (self.morpheme_model.log_likelihood()
+                + self.length_model.log_likelihood())
+
     def __repr__(self):
         return 'PoissonUnigram(length ~ {self.length_model}, morph ~ {self.morpheme_model})'.format(self=self)
 
+# TODO: rename PatternBigram
 class Bigram:
     def __init__(self, K, beta):
         self.morpheme_models = [DirichletMultinomial(K+1, beta) for _ in range(K+1)]
@@ -54,6 +59,9 @@ class Bigram:
 
     def prob(self, pattern):
         return sum(self.morpheme_models[x].prob(y) for x, y in self._bigrams(pattern))
+
+    def log_likelihood(self):
+        return sum(m.log_likelihood() for m in self.morpheme_models)
 
     def __repr__(self):
         return 'Bigram(stem\'|stem ~ Mult ~ Dir)'
@@ -95,10 +103,13 @@ class MorphoProcess:
         return max((self.analysis_prob(analysis), analysis)
             for analysis in self.analyses[k])
 
-    def log_likelihood(self):
-        # XXX pseudo log-likelihood
+    def pseudo_log_likelihood(self):
         return sum(self.prob(k) * len(assignments)
                 for k, assignments in self.assignments.iteritems())
+
+    def log_likelihood(self):
+        return (self.stem_model.log_likelihood()
+                + self.morpheme_model.log_likelihood())
 
     def __repr__(self):
         return 'MorphoProcess(#words={N} | stem ~ {self.stem_model}, morphemes ~ {self.morpheme_model})'.format(self=self, N=sum(map(len, self.assignments.itervalues())))
@@ -129,10 +140,13 @@ class TopicModel:
         return np.logaddexp.reduce([self.topic_prob(doc, word, k)
             for k in xrange(self.Ntopics)])
 
-    def log_likelihood(self):
-        # XXX pseudo log-likelihood
+    def pseudo_log_likelihood(self):
         return sum(self.prob(doc, word) * len(assignments)
                 for (doc, word), assignments in self.assignments.iteritems())
+
+    def log_likelihood(self):
+        return (sum(dt.log_likelihood() for dt in self.document_topic)
+                + sum(tw.log_likelihood() for tw in self.topic_word))
 
     def __repr__(self):
         return 'TopicModel(#topics={self.Ntopics})'.format(self=self)
