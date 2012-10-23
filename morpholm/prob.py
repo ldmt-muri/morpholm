@@ -12,6 +12,7 @@ def mult_sample(vals):
     for k, v in vals:
         if x < v: return k
         x -= v
+    return k
 
 def remove_random(assignments):
     i = random.randrange(0, len(assignments))
@@ -145,3 +146,10 @@ class Uniform:
 
     def log_likelihood(self):
         return - self.count * self.logN
+
+# TODO remove
+import seq_model
+class SimpleBigram:
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.__class__ = seq_model.SimpleBigram

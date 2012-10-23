@@ -5,13 +5,18 @@ from corpus import Vocabulary, ngrams, encode_corpus
 from analysis import Analyzer, analyze_corpus, init_vocabularies, Analysis
 from prob import CharLM
 from pyp import PYP, PYPLM
-from model import MorphoProcess, Bigram
+from model import MorphoProcess, BigramPattern, PoissonUnigramPattern
 
-theta = 1.0
-d = 0.8
-alpha = 1.0
-p = 0.8
+# Main PYP
+theta, d = 1.0, 0.8
+# Stem PYP
+alpha, p = 1.0, 0.8
+# Pattern PYP
+nu, q = 1.0, 0.8
+# Morpheme prior
 beta = 1.0
+# Length prior
+gamma, delta = 1.0, 1.0
 
 def run_sampler(model, corpus, n_iter):
     for it in range(n_iter):
@@ -42,6 +47,7 @@ def main():
     parser.add_argument('--fst', help='compiled morphoanalyzer')
     parser.add_argument('--charlm', help='character language model (KenLM format)',
                         required=True)
+    parser.add_argument('--model', help='type of model to train (1/2/3)', type=int, default=2)
     parser.add_argument('-n', '--order', help='language model order',
                         required=True, type=int)
     parser.add_argument('-i', '--iterations', help='number of iterations',
@@ -65,8 +71,7 @@ def main():
         n_stems = len(vocabularies['stem'])
         n_morphemes = len(vocabularies['morpheme'])
         n_analyses = sum(len(analyses) for analyses in word_analyses.itervalues())
-        n_patterns = len(set(analysis.pattern for analyses in word_analyses.itervalues()
-                             for analysis in analyses))
+        n_patterns = len(vocabularies['pattern'])
 
         logging.info('Corpus size: %d tokens', len(training_corpus))
         logging.info('Voc size: %d words / %d morphemes / %d stems',
@@ -76,8 +81,16 @@ def main():
         assert len(word_analyses) == n_words
 
         char_lm.vocabulary = vocabularies['stem']
-        #mp = MorphoProcess(PYP(alpha, p, char_lm), PYP(alpha, p, Bigram(n_morphemes, beta)), word_analyses)
-        mp = MorphoProcess(PYP(alpha, p, char_lm), Bigram(n_morphemes, beta), word_analyses)
+        if args.model == 1:
+            pattern_model = PoissonUnigramPattern(n_morphemes, beta, gamma, delta,
+                    vocabularies['pattern'])
+        elif args.model == 2:
+            pattern_model = BigramPattern(n_morphemes, beta, vocabularies['pattern'])
+        elif args.model == 3:
+            pattern_model = PYP(nu, q, BigramPattern(n_morphemes, beta,
+                vocabularies['pattern']))
+
+        mp = MorphoProcess(PYP(alpha, p, char_lm), pattern_model, word_analyses)
 
         model = PYPLM(theta, d, args.order, mp)
 

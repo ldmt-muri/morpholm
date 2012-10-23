@@ -25,8 +25,7 @@ def main():
     n_stems = len(vocabularies['stem'])
     n_morphemes = len(vocabularies['morpheme'])
     n_analyses = sum(len(analyses) for analyses in word_analyses.itervalues())
-    n_patterns = len(set(analysis.pattern for analyses in word_analyses.itervalues()
-                         for analysis in analyses))
+    n_patterns = len(vocabularies['pattern'])
 
     logging.info('Corpus size: %d tokens', len(corpus))
     logging.info('Voc size: %d words / %d morphemes / %d stems',

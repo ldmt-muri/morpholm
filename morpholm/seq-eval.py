@@ -4,24 +4,20 @@ import argparse
 import cPickle
 import math
 from analysis import Analyzer, analyze_corpus
-from pyp import PYP
 
 def print_ppl(model, corpus):
-    n_words = 0
-    loglik = 0
-    for word in corpus:
-        n_words += 1
-        loglik += model.prob(word)
+    n_words = len(corpus) + len(corpus.sentences) # + </s>
+    loglik = sum(model.prob(sentence) for sentence in corpus.sentences)
     ppl = math.exp(-loglik / n_words)
     logging.info('Words: %d\tLL: %.0f\tppl: %.3f', n_words, loglik, ppl)
 
 def decode_corpus(model, corpus, vocabularies):
-    for word in corpus:
-        p, dec = model.decode(word)
-        print(dec.decode(vocabularies).encode('utf8'))
+    for sentence in corpus.sentences:
+        _, decoded = model.viterbi(sentence)
+        print('\n'.join(analysis.decode(vocabularies).encode('utf8') for analysis in decoded))
 
 def main():
-    parser = argparse.ArgumentParser(description='Evaluate MorphoLM')
+    parser = argparse.ArgumentParser(description='Use MorphoHMM')
     parser.add_argument('--fst', help='compiled morphoanalyzer', required=True)
     parser.add_argument('--backend', help='analyzer type (foma/xfst/pymorphy)', default='foma')
     parser.add_argument('--notrust', help='do not trust analyzer and also keep non-analyzed word', action='store_true')
@@ -44,8 +40,10 @@ def main():
     word_analyses = data['analyses']
     model = data['model']
 
-    mp = model.base if isinstance(model, PYP) else model
-    mp.stem_model.base.vocabulary = vocabularies['stem']
+    char_lm = model.stem_model.backoff.models[()].base
+    char_lm.vocabulary = vocabularies['stem']
+
+    logging.info('Using model: %s', model)
 
     test_corpus = analyze_corpus(sys.stdin, analyzer, vocabularies, word_analyses)
 

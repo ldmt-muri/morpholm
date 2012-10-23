@@ -66,39 +66,6 @@ class Analyzer:
 
 analysis_fix = re.compile('A\+(\d)')
 
-class MorphemePattern:
-    def __init__(self, morphemes):
-        self.morphemes = morphemes
-        self._hash = hash(tuple(self.morphemes))
-
-    @property
-    def right_morphemes(self):
-        self._split()
-        return self._right
-
-    @property
-    def left_morphemes(self):
-        self._split()
-        return self._left
-
-    def _split(self):
-        if not hasattr(self, '_right'):
-            stem_index = self.morphemes.index(STEM)
-            self._left = self.morphemes[stem_index-1::-1]
-            self._right = self.morphemes[stem_index+1:]
-
-    def __iter__(self):
-        return (morpheme for morpheme in self.morphemes if morpheme != STEM)
-
-    def __len__(self):
-        return len(self.morphemes) - 1
-
-    def __eq__(self, other):
-        return hash(self) == hash(other)
-
-    def __hash__(self):
-        return self._hash
-
 class Analysis:
     def __init__(self, analysis, vocabularies):
         """ Split the morphemes from the output of the analyzer """
@@ -117,16 +84,17 @@ class Analysis:
                 morphemes.append(STEM)
         if self.stem is None:
             raise AnalysisError(analysis)
-        self.pattern = MorphemePattern(morphemes)
+        self.pattern = vocabularies['pattern'][tuple(morphemes)]
+
+    def decode_pattern(self, morphemes, vocabularies):
+        for morph in morphemes:
+            if morph == STEM:
+                yield vocabularies['stem'][self.stem]
+            else:
+                yield vocabularies['morpheme'][morph]
 
     def decode(self, vocabularies):
-        def m():
-            for morph in self.pattern.morphemes:
-                if morph == STEM:
-                    yield self.decode_stem(vocabularies['stem'])
-                else:
-                    yield vocabularies['morpheme'][morph]
-        return '+'.join(m())
+        return '+'.join(self.decode_pattern(vocabularies['pattern'][self.pattern], vocabularies))
 
 def analyze_corpus(stream, fsm, vocabularies, word_analyses):
     sys.stderr.write('Reading corpus ')
@@ -155,7 +123,12 @@ def analyze_corpus(stream, fsm, vocabularies, word_analyses):
 
 def init_vocabularies(*init):
     vocabularies = {'word': corpus.Vocabulary(*init),
-                    'morpheme': corpus.Vocabulary(),
-                    'stem': corpus.Vocabulary()}
+                    'stem': corpus.Vocabulary(),
+                    'pattern': corpus.Vocabulary(),
+                    'morpheme': corpus.Vocabulary()}
     assert (vocabularies['morpheme']['stem'] == STEM)
     return vocabularies
+
+# TODO remove
+class MorphemePattern:
+    pass

@@ -1,40 +1,49 @@
 import logging
+import sys
 import argparse
 import math
 import cPickle
+from itertools import izip
+from corpus import hmm_trigrams
 from prob import CharLM
-from pyp import PYP
-from model import MorphoProcess, PoissonUnigramPattern, BigramPattern
+from pyp import PYPLM
+from model import BigramPattern
+from seq_model import SeqMorphoProcess, SimpleBigram
 
-# Main PYP
-theta, d = 1.0, 0.8
 # Stem PYP
 alpha, p = 1.0, 0.8
 # Pattern PYP
 nu, q = 1.0, 0.8
 # Morpheme prior
 beta = 1.0
-# Length prior
-gamma, delta = 1.0, 1.0
 
 def run_sampler(model, corpus, n_iter):
+    assignments = [[None]*len(sentence)+[0] for sentence in corpus.sentences]
     for it in range(n_iter):
         logging.info('Iteration %d/%d', it+1, n_iter)
-        for word in corpus:
-            if it > 0: model.decrement(word)
-            model.increment(word)
+        for sn, (sentence, sentence_assignments) in\
+                enumerate(izip(corpus.sentences, assignments)):
+            if sn % 1000 == 999:
+                sys.stderr.write('.')
+                sys.stderr.flush()
+            trigrams = hmm_trigrams(sentence)
+            for k, seq in enumerate(trigrams):
+                if it > 0 and len(model.analyses[seq[1]]) == 1: continue
+                ass_seq = tuple(sentence_assignments[k+i] for i in (-1, 0, 1))
+                if it > 0: model.decrement(*izip(seq, ass_seq))
+                sentence_assignments[k] = model.increment(*izip(seq, ass_seq))
+        sys.stderr.write('\n')
         ll = model.log_likelihood()
         ppl = math.exp(-ll / len(corpus))
         logging.info('LL=%.0f ppl=%.3f', ll, ppl)
         logging.info('Model: %s', model)
 
 def main():
-    parser = argparse.ArgumentParser(description='Train MorphoLM')
+    parser = argparse.ArgumentParser(description='Train MorphoHMM')
     parser.add_argument('-i', '--iterations', help='number of iterations', required=True, type=int)
     parser.add_argument('--train', help='compiled training corpus', required=True)
     parser.add_argument('--charlm', help='character language model (KenLM format)', required=True)
-    parser.add_argument('--pyp', help='top model is PYP(p0=MP) instead of MP', action='store_true') 
-    parser.add_argument('--model', help='type of model to train (1/2/3)', type=int, default=3)
+    parser.add_argument('--pattern-lm', help='use LM for pattern', action='store_true')
     parser.add_argument('--output', '-o', help='model output path')
     args = parser.parse_args()
 
@@ -46,26 +55,18 @@ def main():
     word_analyses = data['analyses']
     training_corpus = data['corpus']
 
-    n_morphemes = len(vocabularies['morpheme'])
-
     char_lm = CharLM(args.charlm)
     char_lm.vocabulary = vocabularies['stem']
 
-    if args.model == 1:
-        pattern_model = PoissonUnigramPattern(n_morphemes, beta, gamma, delta, vocabularies['pattern'])
-    elif args.model == 2:
-        pattern_model = BigramPattern(n_morphemes, beta, vocabularies['pattern'])
-    elif args.model == 3:
-        pattern_model = PYP(nu, q, BigramPattern(n_morphemes, beta, vocabularies['pattern']))
-
-    mp = MorphoProcess(PYP(alpha, p, char_lm), pattern_model, word_analyses)
-
-    if args.pyp:
-        logging.info('Top model is PYP')
-        model = PYP(theta, d, mp)
+    stem_model = PYPLM(alpha, p, 2, char_lm)
+    if args.pattern_lm:
+        logging.info('pattern ~ PYPLM')
+        n_morphemes = len(vocabularies['morpheme'])
+        pattern_model = PYPLM(nu, q, 2, BigramPattern(n_morphemes, beta, vocabularies['pattern']))
     else:
-        logging.info('Top model is MorphoProcess')
-        model = mp
+        logging.info('pattern ~ Simple bigram')
+        pattern_model = SimpleBigram(nu, len(vocabularies['pattern']))
+    model = SeqMorphoProcess(stem_model, pattern_model, word_analyses)
 
     logging.info('Training model')
     run_sampler(model, training_corpus, args.iterations)

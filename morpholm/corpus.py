@@ -59,12 +59,3 @@ def hmm_trigrams(sentence):
         trigram.append(w)
         if len(trigram) == 3:
             yield tuple(trigram)
-
-# XXX remove:
-Analysis = None
-MorphemePattern = None
-def reload_analysis():
-    global Analysis, MorphemePattern
-    import analysis
-    Analysis = analysis.Analysis
-    MorphemePattern = analysis.MorphemePattern

@@ -2,27 +2,35 @@ import math
 import numpy as np
 from collections import defaultdict
 from itertools import tee, izip
+from analysis import STEM
 from prob import mult_sample, remove_random, DirichletMultinomial, GammaPoisson
 
-class PoissonUnigram:
-    def __init__(self, K, beta, gamma, delta):
+class PoissonUnigramPattern:
+    def __init__(self, K, beta, gamma, delta, vocabulary):
         self.morpheme_model = DirichletMultinomial(K, beta)
         self.length_model = GammaPoisson(gamma, delta)
+        self.vocabulary = vocabulary
+
+    def _unigrams(self, pattern):
+        return [m for m in self.vocabulary[pattern] if m != STEM]
 
     def increment(self, pattern):
-        for morpheme in pattern:
+        morphemes = self._unigrams(pattern)
+        for morpheme in morphemes:
             self.morpheme_model.increment(morpheme)
-        self.length_model.increment(len(pattern))
+        self.length_model.increment(len(morphemes))
 
     def decrement(self, pattern):
-        for morpheme in pattern:
+        morphemes = self._unigrams(pattern)
+        for morpheme in morphemes:
             self.morpheme_model.decrement(morpheme)
-        self.length_model.decrement(len(pattern))
+        self.length_model.decrement(len(morphemes))
 
     def prob(self, pattern):
-        return (sum(map(self.morpheme_model.weight, pattern)) +
-                self.morpheme_model.gamma_factor(len(pattern)) +
-                self.length_model.prob(len(pattern)))
+        morphemes = self._unigrams(pattern)
+        return (sum(map(self.morpheme_model.weight, morphemes)) +
+                self.morpheme_model.gamma_factor(len(morphemes)) +
+                self.length_model.prob(len(morphemes)))
 
     def log_likelihood(self):
         return (self.morpheme_model.log_likelihood()
@@ -31,16 +39,16 @@ class PoissonUnigram:
     def __repr__(self):
         return 'PoissonUnigram(length ~ {self.length_model}, morph ~ {self.morpheme_model})'.format(self=self)
 
-# TODO: rename PatternBigram
-class Bigram:
-    def __init__(self, K, beta):
+class BigramPattern:
+    def __init__(self, K, beta, vocabulary):
         self.morpheme_models = [DirichletMultinomial(K+1, beta) for _ in range(K+1)]
         self.START = K
         self.STOP = K
+        self.vocabulary = vocabulary
 
     def _unigrams(self, pattern):
         yield self.START
-        for m in pattern.morphemes:
+        for m in self.vocabulary[pattern]:
             yield m
         yield self.STOP
 
@@ -150,3 +158,14 @@ class TopicModel:
 
     def __repr__(self):
         return 'TopicModel(#topics={self.Ntopics})'.format(self=self)
+
+# TODO remove
+class PoissonUnigram:
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.__class__ = PoissonUnigramPattern
+
+class Bigram:
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.__class__ = BigramPattern

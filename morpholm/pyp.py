@@ -27,18 +27,15 @@ class CRP(object):
         self.ncustomers[k] -= 1
         self.total_customers -= 1
         tables = self.tables[k]
-        for t in xrange(len(tables)):
-            if i < tables[t]:
-                tables[t] -= 1
-                if tables[t] == 0: # cleanup empty table
-                    del tables[t]
-                    self.ntables -= 1
-                    if len(tables) == 0: # cleanup dish
-                        del self.tables[k]
-                        del self.ncustomers[k]
-                    return True
-                return False
-            i -= tables[t]
+        tables[i] -= 1
+        if tables[i] == 0: # cleanup empty table
+            del tables[i]
+            self.ntables -= 1
+            if len(tables) == 0: # cleanup dish
+                del self.tables[k]
+                del self.ncustomers[k]
+            return True
+        return False
 
 class PYP(CRP):
     def __init__(self, theta, d, base):
@@ -57,13 +54,19 @@ class PYP(CRP):
         else:
             yield -1, 1
 
+    def _customer_table(self, k, n): # find table index of nth customer with dish k
+        tables = self.tables[k]
+        for i in xrange(len(tables)):
+            if n < tables[i]: return i
+            n -= tables[i]
+
     def increment(self, k):
         i = mult_sample(self._dish_tables(k))
         if self._seat_to(k, i):
             self.base.increment(k)
 
     def decrement(self, k):
-        i = random.randint(0, self.ncustomers[k]-1)
+        i = self._customer_table(k, random.randint(0, self.ncustomers[k]-1))
         if self._unseat_from(k, i):
             self.base.decrement(k)
     
