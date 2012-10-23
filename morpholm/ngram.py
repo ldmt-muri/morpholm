@@ -36,7 +36,7 @@ def print_ppl(model, corpus):
     for sentence in corpus.sentences:
         for seq in ngrams(sentence, model.order):
             n_words += 1
-            loglik += model.prob(seq)
+            loglik += math.log(model.prob(seq))
     ppl = math.exp(-loglik / n_words)
     logging.info('Words: %d\tLL: %.0f\tppl: %.3f', n_words, loglik, ppl)
 

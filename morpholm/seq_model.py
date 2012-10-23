@@ -1,9 +1,5 @@
-import math
-import numpy
 from prob import mult_sample, DirichletMultinomial
 from corpus import START, STOP
-
-logsumexp = numpy.logaddexp.reduce
 
 class SimpleBigram:
     def __init__(self, alpha, n_ctx):
@@ -50,13 +46,13 @@ class SeqMorphoProcess:
         # Sample assignment
         if i_next is None: # no future yet
             i = (0 if len(self.analyses[k]) == 1 else
-                    mult_sample((i, math.exp(self.analysis_prob(a_prev, a)))
+                    mult_sample((i, self.analysis_prob(a_prev, a))
                         for i, a in enumerate(self.analyses[k])))
         else: # after 1st iteration
             a_next = self.analyses[k_next][i_next]
             i = (0 if len(self.analyses[k]) == 1 else
-                    mult_sample((i, math.exp(self.analysis_prob(a_prev, a)
-                                           + self.analysis_prob(a, a_next)))
+                    mult_sample((i, (self.analysis_prob(a_prev, a) 
+                                   * self.analysis_prob(a, a_next)))
                         for i, a in enumerate(self.analyses[k])))
         # Increment models
         a = self.analyses[k][i]
@@ -81,7 +77,7 @@ class SeqMorphoProcess:
         self.morpheme_model.decrement((a.pattern, a_next.pattern))
 
     def analysis_prob(self, analysis1, analysis2):
-        return (self.stem_model.prob((analysis1.stem, analysis2.stem)) +
+        return (self.stem_model.prob((analysis1.stem, analysis2.stem)) *
                 self.morpheme_model.prob((analysis1.pattern, analysis2.pattern)))
 
     def log_likelihood(self):
@@ -89,10 +85,10 @@ class SeqMorphoProcess:
                 + self.morpheme_model.log_likelihood())
 
     def viterbi(self, sentence):
-        probs = [[(0, None)]]
+        probs = [[(1, None)]]
         seq = [START]+sentence+[STOP]
         for k in xrange(1, len(sentence)+2):
-            probs.append([max((self.analysis_prob(a_prev, a) + probs[k-1][i_prev][0], i_prev)
+            probs.append([max((self.analysis_prob(a_prev, a) * probs[k-1][i_prev][0], i_prev)
                 for i_prev, a_prev in enumerate(self.analyses[seq[k-1]]))
                 for a in self.analyses[seq[k]]])
         _, best_prob = probs[-1][0]
@@ -104,11 +100,11 @@ class SeqMorphoProcess:
         return best_prob, best[::-1]
 
     def prob(self, sentence):
-        probs = [[0]]
+        probs = [[1]]
         seq = [START]+sentence+[STOP]
         for k in xrange(1, len(sentence)+2):
-            probs.append([logsumexp([self.analysis_prob(a_prev, a) + probs[k-1][i_prev]
-                for i_prev, a_prev in enumerate(self.analyses[seq[k-1]])])
+            probs.append([sum(self.analysis_prob(a_prev, a) * probs[k-1][i_prev]
+                for i_prev, a_prev in enumerate(self.analyses[seq[k-1]]))
                 for a in self.analyses[seq[k]]])
         return probs[-1][0]
 

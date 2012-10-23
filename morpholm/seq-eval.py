@@ -7,7 +7,7 @@ from analysis import Analyzer, analyze_corpus
 
 def print_ppl(model, corpus):
     n_words = len(corpus) + len(corpus.sentences) # + </s>
-    loglik = sum(model.prob(sentence) for sentence in corpus.sentences)
+    loglik = sum(math.log(model.prob(sentence)) for sentence in corpus.sentences)
     ppl = math.exp(-loglik / n_words)
     logging.info('Words: %d\tLL: %.0f\tppl: %.3f', n_words, loglik, ppl)
 

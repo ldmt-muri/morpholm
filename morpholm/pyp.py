@@ -50,7 +50,7 @@ class PYP(CRP):
             for i, n in enumerate(self.tables[k]):
                 yield i, n-self.d
             # new table
-            yield -1, (self.theta + self.d * self.ntables) * math.exp(self.base.prob(k))
+            yield -1, (self.theta + self.d * self.ntables) * self.base.prob(k)
         else:
             yield -1, 1
 
@@ -72,15 +72,11 @@ class PYP(CRP):
     
     def prob(self, k): # total prob for dish k
         # new table
-        w = (self.theta + self.d * self.ntables) * math.exp(self.base.prob(k))
+        w = (self.theta + self.d * self.ntables) * self.base.prob(k)
         # existing tables
         if k in self.tables:
             w += self.ncustomers[k] - self.d * len(self.tables[k])
-        return math.log(w / (self.theta + self.total_customers))
-
-    def pseudo_log_likelihood(self):
-        return sum(count * self.prob(k)
-                for k, count in self.ncustomers.iteritems())
+        return w / (self.theta + self.total_customers)
 
     def log_likelihood(self, base=True):
         ll = (math.lgamma(self.theta) - math.lgamma(self.theta + self.total_customers)
@@ -95,10 +91,10 @@ class PYP(CRP):
 
     def decode(self, k):
         p0, dec = self.base.decode(k)
-        w = (self.theta + self.d * self.ntables) * math.exp(p0)
+        w = (self.theta + self.d * self.ntables) * p0
         if k in self.tables:
             w += self.ncustomers[k] - self.d * len(self.tables[k])
-        return math.log(w / (self.theta + self.total_customers)), dec
+        return w / (self.theta + self.total_customers), dec
 
     def __repr__(self):
         return 'PYP(d={self.d}, theta={self.theta}, #customers={self.total_customers}, #tables={self.ntables}, #dishes={V}, Base={self.base})'.format(self=self, V=len(self.tables))

@@ -1,9 +1,10 @@
-import math
-import numpy as np
+import operator
 from collections import defaultdict
-from itertools import tee, izip
+from itertools import tee, izip, imap
 from analysis import STEM
 from prob import mult_sample, remove_random, DirichletMultinomial, GammaPoisson
+
+prod = lambda it: reduce(operator.mul, it, 1)
 
 class PoissonUnigramPattern:
     def __init__(self, K, beta, gamma, delta, vocabulary):
@@ -28,8 +29,8 @@ class PoissonUnigramPattern:
 
     def prob(self, pattern):
         morphemes = self._unigrams(pattern)
-        return (sum(map(self.morpheme_model.weight, morphemes)) +
-                self.morpheme_model.gamma_factor(len(morphemes)) +
+        return (prod(imap(self.morpheme_model.weight, morphemes)) *
+                self.morpheme_model.gamma_factor(len(morphemes)) *
                 self.length_model.prob(len(morphemes)))
 
     def log_likelihood(self):
@@ -66,7 +67,7 @@ class BigramPattern:
             self.morpheme_models[x].decrement(y)
 
     def prob(self, pattern):
-        return sum(self.morpheme_models[x].prob(y) for x, y in self._bigrams(pattern))
+        return prod(self.morpheme_models[x].prob(y) for x, y in self._bigrams(pattern))
 
     def log_likelihood(self):
         return sum(m.log_likelihood() for m in self.morpheme_models)
@@ -84,7 +85,7 @@ class MorphoProcess:
     def increment(self, k):
         # Sample analysis & store assignment
         i = (0 if len(self.analyses[k]) == 1 else
-                mult_sample((i, math.exp(self.analysis_prob(analysis)))
+                mult_sample((i, self.analysis_prob(analysis))
                     for i, analysis in enumerate(self.analyses[k])))
         self.assignments[k].append(i)
         analysis = self.analyses[k][i]
@@ -100,20 +101,15 @@ class MorphoProcess:
         self.morpheme_model.decrement(analysis.pattern)
 
     def analysis_prob(self, analysis):
-        return (self.stem_model.prob(analysis.stem) +
+        return (self.stem_model.prob(analysis.stem) *
                 self.morpheme_model.prob(analysis.pattern))
 
     def prob(self, k):
-        return np.logaddexp.reduce([self.analysis_prob(analysis)
-            for analysis in self.analyses[k]])
+        return sum(self.analysis_prob(analysis) for analysis in self.analyses[k])
 
     def decode(self, k):
         return max((self.analysis_prob(analysis), analysis)
             for analysis in self.analyses[k])
-
-    def pseudo_log_likelihood(self):
-        return sum(self.prob(k) * len(assignments)
-                for k, assignments in self.assignments.iteritems())
 
     def log_likelihood(self):
         return (self.stem_model.log_likelihood()
@@ -130,8 +126,7 @@ class TopicModel:
         self.assignments = defaultdict(list)
 
     def increment(self, doc, word):
-        z = mult_sample((k, math.exp(self.topic_prob(doc, word, k)))
-                for k in xrange(self.Ntopics))
+        z = mult_sample((k, self.topic_prob(doc, word, k)) for k in xrange(self.Ntopics))
         self.assignments[doc, word].append(z)
         self.document_topic[doc].increment(z)
         self.topic_word[z].increment(word)
@@ -142,15 +137,10 @@ class TopicModel:
         self.topic_word[z].decrement(word)
 
     def topic_prob(self, doc, word, k):
-        return self.document_topic[doc].prob(k) + self.topic_word[k].prob(word)
+        return self.document_topic[doc].prob(k) * self.topic_word[k].prob(word)
 
     def prob(self, doc, word):
-        return np.logaddexp.reduce([self.topic_prob(doc, word, k)
-            for k in xrange(self.Ntopics)])
-
-    def pseudo_log_likelihood(self):
-        return sum(self.prob(doc, word) * len(assignments)
-                for (doc, word), assignments in self.assignments.iteritems())
+        return sum(self.topic_prob(doc, word, k) for k in xrange(self.Ntopics))
 
     def log_likelihood(self):
         return (sum(dt.log_likelihood() for dt in self.document_topic)

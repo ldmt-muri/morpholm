@@ -1,8 +1,8 @@
 import os
 import math
-import numpy as np
 import random
 from collections import Counter
+from corpus import STOP
 import kenlm
 
 def mult_sample(vals):
@@ -20,9 +20,6 @@ def remove_random(assignments):
     del assignments[i]
     return assignment
 
-LOG10 = math.log(10)
-SPECIAL = set(('<s>', '</s>'))
-
 class CharLM(kenlm.LanguageModel):
     def __init__(self, path):
         super(CharLM, self).__init__(path)
@@ -36,12 +33,11 @@ class CharLM(kenlm.LanguageModel):
         self.counts[k] -= 1
 
     def prob(self, k):
-        word = self.vocabulary[k]
-        if word in SPECIAL: return 0
-        return self.score(' '.join(word))*LOG10
+        if k == STOP: return 1
+        return 10**self.score(' '.join(self.vocabulary[k]))
 
     def log_likelihood(self):
-        return sum(self.prob(k) * c for k, c in self.counts.iteritems())
+        return sum(math.log(self.prob(k)) * c for k, c in self.counts.iteritems())
 
     def __repr__(self):
         return 'CharLM(n={self.order})'.format(self=self)
@@ -52,10 +48,10 @@ class CharLM(kenlm.LanguageModel):
 class FixedMixModel:
     def __init__(self, models, coeffs):
         assert sum(coeffs) == 1 and len(models) == len(coeffs)
-        self.mix = zip(models, map(math.log, coeffs))
+        self.mix = zip(models, coeffs)
 
     def prob(self, k):
-        return np.logaddexp.reduce([c+m.prob(k) for m, c in self.mix])
+        return sum(c*m.prob(k) for m, c in self.mix)
 
 class DirichletMultinomial:
     def __init__(self, K, alpha):
@@ -75,20 +71,20 @@ class DirichletMultinomial:
         self.N -= 1
 
     def prob(self, k):
-        # = self.weight(k) + self.gamma_factor(1)
+        # = self.weight(k) * self.gamma_factor(1)
         assert k >= 0
-        if k > self.K: return -np.inf
-        return math.log((self.alpha + self.count[k])/(self.K * self.alpha + self.N))
+        if k > self.K: return 0
+        return (self.alpha + self.count[k])/(self.K * self.alpha + self.N)
 
     def weight(self, k):
         assert k >= 0
-        if k > self.K: return -np.inf
-        return math.log((self.alpha + self.count[k]))
+        if k > self.K: return 0
+        return (self.alpha + self.count[k])
 
     def gamma_factor(self, n):
-        if n == 0: return 0
-        if n == 1: return -math.log(self.K * self.alpha + self.N)
-        return (math.lgamma(self.K * self.alpha + self.N)
+        if n == 0: return 1
+        if n == 1: return 1/(self.K * self.alpha + self.N)
+        return math.exp(math.lgamma(self.K * self.alpha + self.N)
                 - math.lgamma(self.K * self.alpha + self.N + n))
 
     def log_likelihood(self):
@@ -121,7 +117,8 @@ class GammaPoisson:
     def prob(self, l):
         r = self.L + self.alpha
         p = 1 / (self.N + self.beta + 1)
-        return log_binomial_coeff(l, l + r - 1) + r * math.log(1 - p) + l * math.log(p)
+        return math.exp(log_binomial_coeff(l, l + r - 1)
+                + r * math.log(1 - p) + l * math.log(p))
 
     # TODO log_likelihood
 
@@ -132,7 +129,6 @@ class Uniform:
     def __init__(self, N):
         self.N = N
         self.count = 0
-        self.logN = math.log(N)
 
     def increment(self, k):
         self.count += 1
@@ -141,11 +137,11 @@ class Uniform:
         self.count -= 1
 
     def prob(self, k):
-        if k > self.N: return -np.inf
-        return -self.logN
+        if k > self.N: return 0
+        return 1/self.N
 
     def log_likelihood(self):
-        return - self.count * self.logN
+        return - self.count * math.log(self.N)
 
 # TODO remove
 import seq_model

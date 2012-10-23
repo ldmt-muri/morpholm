@@ -11,7 +11,7 @@ def print_ppl(model, corpus):
     loglik = 0
     for word in corpus:
         n_words += 1
-        loglik += model.prob(word)
+        loglik += math.log(model.prob(word))
     ppl = math.exp(-loglik / n_words)
     logging.info('Words: %d\tLL: %.0f\tppl: %.3f', n_words, loglik, ppl)
 
