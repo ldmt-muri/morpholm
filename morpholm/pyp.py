@@ -66,7 +66,7 @@ class PYP(CRP):
             self.base.increment(k)
 
     def decrement(self, k):
-        i = self._customer_table(k, random.randint(0, self.ncustomers[k]-1))
+        i = self._customer_table(k, random.randrange(0, self.ncustomers[k]))
         if self._unseat_from(k, i):
             self.base.decrement(k)
     

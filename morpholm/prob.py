@@ -25,6 +25,7 @@ class CharLM(kenlm.LanguageModel):
         super(CharLM, self).__init__(path)
         self.path = os.path.abspath(path)
         self.counts = Counter()
+        self.memo = {}
 
     def increment(self, k):
         self.counts[k] += 1
@@ -34,7 +35,9 @@ class CharLM(kenlm.LanguageModel):
 
     def prob(self, k):
         if k == STOP: return 1
-        return 10**self.score(' '.join(self.vocabulary[k]))
+        if k not in self.memo:
+            self.memo[k] = 10**self.score(' '.join(self.vocabulary[k]))
+        return self.memo[k]
 
     def log_likelihood(self):
         return sum(math.log(self.prob(k)) * c for k, c in self.counts.iteritems())

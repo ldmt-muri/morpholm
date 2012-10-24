@@ -1,5 +1,4 @@
 import logging
-import sys
 import argparse
 import math
 import cPickle
@@ -19,20 +18,15 @@ beta = 1.0
 
 def run_sampler(model, corpus, n_iter):
     assignments = [[None]*len(sentence)+[0] for sentence in corpus.sentences]
-    for it in range(n_iter):
+    for it in xrange(n_iter):
         logging.info('Iteration %d/%d', it+1, n_iter)
-        for sn, (sentence, sentence_assignments) in\
-                enumerate(izip(corpus.sentences, assignments)):
-            if sn % 1000 == 999:
-                sys.stderr.write('.')
-                sys.stderr.flush()
+        for sentence, sentence_assignments in izip(corpus.sentences, assignments):
             trigrams = hmm_trigrams(sentence)
             for k, seq in enumerate(trigrams):
                 if it > 0 and len(model.analyses[seq[1]]) == 1: continue
                 ass_seq = tuple(sentence_assignments[k+i] for i in (-1, 0, 1))
                 if it > 0: model.decrement(*izip(seq, ass_seq))
                 sentence_assignments[k] = model.increment(*izip(seq, ass_seq))
-        sys.stderr.write('\n')
         ll = model.log_likelihood()
         ppl = math.exp(-ll / len(corpus))
         logging.info('LL=%.0f ppl=%.3f', ll, ppl)

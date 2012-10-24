@@ -15,7 +15,7 @@ d_topic = 0.8
 n_iter = 500
 
 def run_sampler(model, corpus, output=None):
-    for it in range(n_iter):
+    for it in xrange(n_iter):
         logging.info('Iteration %d/%d', it+1, n_iter)
         for d, sentence in enumerate(corpus.sentences):
             for word in sentence:

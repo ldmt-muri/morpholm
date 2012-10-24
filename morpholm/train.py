@@ -18,7 +18,7 @@ beta = 1.0
 gamma, delta = 1.0, 1.0
 
 def run_sampler(model, corpus, n_iter):
-    for it in range(n_iter):
+    for it in xrange(n_iter):
         logging.info('Iteration %d/%d', it+1, n_iter)
         for word in corpus:
             if it > 0: model.decrement(word)

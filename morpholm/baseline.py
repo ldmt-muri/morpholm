@@ -4,7 +4,7 @@ from corpus import Vocabulary, encode_corpus
 from prob import CharLM
 from pyp import PYP
 from train import run_sampler
-from ppl import print_ppl
+from eval import print_ppl
 
 def main():
     parser = argparse.ArgumentParser(description='Train PYP 1-gram LM')
