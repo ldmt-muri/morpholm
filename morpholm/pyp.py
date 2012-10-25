@@ -122,21 +122,23 @@ class PYPLM:
         self.models = {}
 
     def __getitem__(self, ctx):
-        if ctx not in self.models:
-            self.models[ctx] = self._get(ctx)
-        return self.models[ctx]
+        h = hash(ctx)
+        if h not in self.models:
+            self.models[h] = self._get(ctx)
+        return self.models[h]
 
     def _get(self, ctx):
-        if ctx not in self.models:
+        h = hash(ctx)
+        if h not in self.models:
             base = (self.backoff if self.order == 1 else BackoffBase(self.backoff, ctx[1:]))
             return PYP(self.theta, self.d, base)
-        return self.models[ctx]
+        return self.models[h]
 
     def increment(self, k):
         self[k[:-1]].increment(k[-1])
 
     def decrement(self, k):
-        self.models[k[:-1]].decrement(k[-1])
+        self[k[:-1]].decrement(k[-1])
 
     def prob(self, k):
         return self._get(k[:-1]).prob(k[-1])

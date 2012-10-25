@@ -53,23 +53,15 @@ class CharLM:
         return np.log(self.probs).dot(self.count)
 
     def __getstate__(self):
-        return (self.lm.path, self.vocabulary, self.K, self.probs.tolist())
+        return (self.lm.path, self.vocabulary)
 
     def __setstate__(self, state):
-        path, self.vocabulary, self.K, probs = state
+        path, self.vocabulary = state
         self.lm = kenlm.LanguageModel(path)
-        self.probs = np.array(probs)
+        self.K = 0
 
     def __repr__(self):
         return 'CharLM(n={self.lm.order})'.format(self=self)
-
-class FixedMixModel:
-    def __init__(self, models, coeffs):
-        assert sum(coeffs) == 1 and len(models) == len(coeffs)
-        self.mix = zip(models, coeffs)
-
-    def prob(self, k):
-        return sum(c*m.prob(k) for m, c in self.mix)
 
 class DirichletMultinomial:
     def __init__(self, K, alpha):
@@ -115,7 +107,7 @@ class DirichletMultinomial:
 
     def __setstate__(self, state):
         self.K, self.alpha, self.count, self.N = state
-        self.count = np.array(self.count)
+        #self.count = np.array(self.count)
 
     def __repr__(self):
         return 'Multinomial(K={self.K}, N={self.N}) ~ Dir({self.alpha})'.format(self=self)
@@ -167,3 +159,6 @@ class Uniform:
 
     def log_likelihood(self):
         return - self.count * math.log(self.N)
+
+    def __repr__(self):
+        return 'Uniform(N={self.N})'
