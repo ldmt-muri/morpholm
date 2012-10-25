@@ -6,7 +6,6 @@ from itertools import izip
 from corpus import hmm_trigrams
 from prob import CharLM
 from pyp import PYPLM
-from model import BigramPattern
 from seq_model import SeqMorphoProcess, SimpleBigram
 
 # Stem PYP
@@ -37,7 +36,6 @@ def main():
     parser.add_argument('-i', '--iterations', help='number of iterations', required=True, type=int)
     parser.add_argument('--train', help='compiled training corpus', required=True)
     parser.add_argument('--charlm', help='character language model (KenLM format)', required=True)
-    parser.add_argument('--pattern-lm', help='use LM for pattern', action='store_true')
     parser.add_argument('--output', '-o', help='model output path')
     args = parser.parse_args()
 
@@ -49,17 +47,11 @@ def main():
     word_analyses = data['analyses']
     training_corpus = data['corpus']
 
-    char_lm = CharLM(args.charlm)
-    char_lm.vocabulary = vocabularies['stem']
+    logging.info('Pre-loading stem CharLM')
+    char_lm = CharLM(args.charlm, vocabularies['stem'])
 
     stem_model = PYPLM(alpha, p, 2, char_lm)
-    if args.pattern_lm:
-        logging.info('pattern ~ PYPLM')
-        n_morphemes = len(vocabularies['morpheme'])
-        pattern_model = PYPLM(nu, q, 2, BigramPattern(n_morphemes, beta, vocabularies['pattern']))
-    else:
-        logging.info('pattern ~ Simple bigram')
-        pattern_model = SimpleBigram(nu, len(vocabularies['pattern']))
+    pattern_model = SimpleBigram(nu, len(vocabularies['pattern']))
     model = SeqMorphoProcess(stem_model, pattern_model, word_analyses)
 
     logging.info('Training model')

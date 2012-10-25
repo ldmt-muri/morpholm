@@ -64,12 +64,13 @@ class Analyzer:
                 return analyses | {word}
         return {word}
 
+# XXX fix for the Dalrymple analyzer
 analysis_fix = re.compile('A\+(\d)')
 
 class Analysis:
     def __init__(self, analysis, vocabularies):
         """ Split the morphemes from the output of the analyzer """
-        analysis = analysis_fix.sub(r'a+\1', analysis) # ??????????????
+        analysis = analysis_fix.sub(r'a+\1', analysis) # XXX apply fix
         morphs = analysis.split('+')
         morphs = (morph for morph in morphs if morph)
         self.stem = None
@@ -121,14 +122,15 @@ def analyze_corpus(stream, fsm, vocabularies, word_analyses):
     sys.stderr.write(' done\n')
     return corpus.Corpus(sentences)
 
-def init_vocabularies(*init):
-    vocabularies = {'word': corpus.Vocabulary(*init),
-                    'stem': corpus.Vocabulary(),
+def init_vocabularies():
+    vocabularies = {'word': corpus.Vocabulary('<s>', '</s>'),
+                    'stem': corpus.Vocabulary('<s>', '</s>'),
                     'pattern': corpus.Vocabulary(),
                     'morpheme': corpus.Vocabulary()}
-    assert (vocabularies['morpheme']['stem'] == STEM)
-    return vocabularies
-
-# TODO remove
-class MorphemePattern:
-    pass
+    assert vocabularies['morpheme']['stem'] == STEM
+    for name in ('word', 'stem'):
+        for w, i in (('<s>', corpus.START), ('</s>', corpus.STOP)):
+            assert vocabularies[w] == i
+    word_analyses = {corpus.START: [Analysis('<s>', vocabularies)],
+                     corpus.STOP: [Analysis('</s>', vocabularies)]}
+    return word_analyses, vocabularies

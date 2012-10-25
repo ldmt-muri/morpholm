@@ -2,8 +2,7 @@ import sys
 import argparse
 import logging
 import cPickle
-from analysis import Analyzer, Analysis, init_vocabularies, analyze_corpus
-from corpus import START, STOP
+from analysis import Analyzer, init_vocabularies, analyze_corpus
 
 def main():
     parser = argparse.ArgumentParser(description='Analyze corpus')
@@ -13,9 +12,7 @@ def main():
     parser.add_argument('--output', '-o', help='analyzed corpus output path', required=True)
     args = parser.parse_args()
 
-    vocabularies = init_vocabularies('<s>', '</s>')
-    word_analyses = {START: [Analysis('<s>', vocabularies)],
-                     STOP: [Analysis('</s>', vocabularies)]}
+    word_analyses, vocabularies = init_vocabularies()
     analyzer = Analyzer(args.fst, args.backend, not args.notrust)
 
     logging.info('Analyzing corpus')

@@ -18,7 +18,6 @@ def main():
 
     logging.info('Training baseline system')
 
-    char_lm = CharLM(args.charlm)
     vocabulary = Vocabulary()
 
     logging.info('Reading training corpus')
@@ -27,7 +26,9 @@ def main():
 
     logging.info('Corpus size: %d tokens | Voc size: %d words', len(training_corpus), len(vocabulary))
 
-    char_lm.vocabulary = vocabulary
+    logging.info('Pre-loading base CharLM')
+    char_lm = CharLM(args.charlm, vocabulary)
+
     model = PYP(args.strength, args.discount, char_lm)
 
     logging.info('Training model')

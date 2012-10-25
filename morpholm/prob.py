@@ -1,8 +1,10 @@
 import os
 import math
 import random
-from collections import Counter
-from corpus import STOP
+try:
+    import numpypy as np
+except ImportError:
+    import numpy as np
 import kenlm
 
 def mult_sample(vals):
@@ -20,33 +22,46 @@ def remove_random(assignments):
     del assignments[i]
     return assignment
 
-class CharLM(kenlm.LanguageModel):
-    def __init__(self, path):
-        super(CharLM, self).__init__(path)
-        self.path = os.path.abspath(path)
-        self.counts = Counter()
-        self.memo = {}
+class CharLM:
+    def __init__(self, path, vocabulary):
+        self.lm = kenlm.LanguageModel(os.path.abspath(path))
+        self.vocabulary = vocabulary
+        self.K = len(vocabulary)
+        self.count = np.zeros(self.K)
+        self.probs = np.zeros(self.K)
+        for k in xrange(self.K):
+            self.probs[k] = self.get_prob(k)
 
     def increment(self, k):
-        self.counts[k] += 1
+        assert (0 <= k < self.K)
+        self.count[k] += 1
 
     def decrement(self, k):
-        self.counts[k] -= 1
+        assert (0 <= k < self.K)
+        self.count[k] -= 1
+
+    def get_prob(self, k):
+        chars = ' '.join(self.vocabulary[k])
+        return 10**self.lm.score(chars)
 
     def prob(self, k):
-        if k == STOP: return 1
-        if k not in self.memo:
-            self.memo[k] = 10**self.score(' '.join(self.vocabulary[k]))
-        return self.memo[k]
+        assert (k >= 0)
+        if k >= self.K: return self.get_prob(k)
+        return self.probs[k]
 
     def log_likelihood(self):
-        return sum(math.log(self.prob(k)) * c for k, c in self.counts.iteritems())
+        return np.log(self.probs).dot(self.count)
+
+    def __getstate__(self):
+        return (self.lm.path, self.vocabulary, self.K, self.probs.tolist())
+
+    def __setstate__(self, state):
+        path, self.vocabulary, self.K, probs = state
+        self.lm = kenlm.LanguageModel(path)
+        self.probs = np.array(probs)
 
     def __repr__(self):
-        return 'CharLM(n={self.order})'.format(self=self)
-
-    def __reduce__(self):
-        return (CharLM, (self.path,))
+        return 'CharLM(n={self.lm.order})'.format(self=self)
 
 class FixedMixModel:
     def __init__(self, models, coeffs):
@@ -60,7 +75,7 @@ class DirichletMultinomial:
     def __init__(self, K, alpha):
         self.K = K
         self.alpha = alpha
-        self.count = [0]*K
+        self.count = np.zeros(K)
         self.N = 0
 
     def increment(self, k):
@@ -94,6 +109,13 @@ class DirichletMultinomial:
         return (math.lgamma(self.K * self.alpha) - math.lgamma(self.K * self.alpha + self.N)
                 + sum(math.lgamma(self.alpha + self.count[k]) for k in xrange(self.K))
                 - self.K * math.lgamma(self.alpha))
+
+    def __getstate__(self):
+        return (self.K, self.alpha, self.count.tolist(), self.N)
+
+    def __setstate__(self, state):
+        self.K, self.alpha, self.count, self.N = state
+        self.count = np.array(self.count)
 
     def __repr__(self):
         return 'Multinomial(K={self.K}, N={self.N}) ~ Dir({self.alpha})'.format(self=self)
@@ -145,10 +167,3 @@ class Uniform:
 
     def log_likelihood(self):
         return - self.count * math.log(self.N)
-
-# TODO remove
-import seq_model
-class SimpleBigram:
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        self.__class__ = seq_model.SimpleBigram

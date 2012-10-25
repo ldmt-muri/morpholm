@@ -148,14 +148,3 @@ class TopicModel:
 
     def __repr__(self):
         return 'TopicModel(#topics={self.Ntopics})'.format(self=self)
-
-# TODO remove
-class PoissonUnigram:
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        self.__class__ = PoissonUnigramPattern
-
-class Bigram:
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        self.__class__ = BigramPattern

@@ -17,6 +17,21 @@ beta = 1.0
 # Length prior
 gamma, delta = 1.0, 1.0
 
+def make_mp(args, vocabularies, word_analyses):
+    logging.info('Pre-loading stem CharLM')
+    char_lm = CharLM(args.charlm, vocabularies['stem'])
+
+    n_morphemes = len(vocabularies['morpheme'])
+    pvoc = vocabularies['pattern']
+    if args.model == 1:
+        pattern_model = PoissonUnigramPattern(n_morphemes, beta, gamma, delta, pvoc)
+    elif args.model == 2:
+        pattern_model = BigramPattern(n_morphemes, beta, pvoc)
+    elif args.model == 3:
+        pattern_model = PYP(nu, q, BigramPattern(n_morphemes, beta, pvoc))
+
+    return MorphoProcess(PYP(alpha, p, char_lm), pattern_model, word_analyses)
+
 def run_sampler(model, corpus, n_iter):
     for it in xrange(n_iter):
         logging.info('Iteration %d/%d', it+1, n_iter)
@@ -29,7 +44,7 @@ def run_sampler(model, corpus, n_iter):
         logging.info('Model: %s', model)
 
 def main():
-    parser = argparse.ArgumentParser(description='Train MorphoLM')
+    parser = argparse.ArgumentParser(description='Train 1-gram MorphoLM')
     parser.add_argument('-i', '--iterations', help='number of iterations', required=True, type=int)
     parser.add_argument('--train', help='compiled training corpus', required=True)
     parser.add_argument('--charlm', help='character language model (KenLM format)', required=True)
@@ -39,26 +54,13 @@ def main():
     args = parser.parse_args()
 
     logging.info('Reading training corpus')
-
     with open(args.train) as f:
         data = cPickle.load(f)
     vocabularies = data['vocabularies']
     word_analyses = data['analyses']
     training_corpus = data['corpus']
 
-    n_morphemes = len(vocabularies['morpheme'])
-
-    char_lm = CharLM(args.charlm)
-    char_lm.vocabulary = vocabularies['stem']
-
-    if args.model == 1:
-        pattern_model = PoissonUnigramPattern(n_morphemes, beta, gamma, delta, vocabularies['pattern'])
-    elif args.model == 2:
-        pattern_model = BigramPattern(n_morphemes, beta, vocabularies['pattern'])
-    elif args.model == 3:
-        pattern_model = PYP(nu, q, BigramPattern(n_morphemes, beta, vocabularies['pattern']))
-
-    mp = MorphoProcess(PYP(alpha, p, char_lm), pattern_model, word_analyses)
+    mp = make_mp(args, vocabularies, word_analyses)
 
     if args.pyp:
         logging.info('Top model is PYP')

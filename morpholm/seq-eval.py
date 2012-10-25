@@ -40,9 +40,6 @@ def main():
     word_analyses = data['analyses']
     model = data['model']
 
-    char_lm = model.stem_model.backoff.models[()].base
-    char_lm.vocabulary = vocabularies['stem']
-
     logging.info('Using model: %s', model)
 
     test_corpus = analyze_corpus(sys.stdin, analyzer, vocabularies, word_analyses)
