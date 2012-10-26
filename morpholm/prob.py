@@ -161,4 +161,4 @@ class Uniform:
         return - self.count * math.log(self.N)
 
     def __repr__(self):
-        return 'Uniform(N={self.N})'
+        return 'Uniform(N={self.N})'.format(self=self)

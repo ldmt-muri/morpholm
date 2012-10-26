@@ -130,7 +130,7 @@ def init_vocabularies():
     assert vocabularies['morpheme']['stem'] == STEM
     for name in ('word', 'stem'):
         for w, i in (('<s>', corpus.START), ('</s>', corpus.STOP)):
-            assert vocabularies[w] == i
+            assert vocabularies[name][w] == i
     word_analyses = {corpus.START: [Analysis('<s>', vocabularies)],
                      corpus.STOP: [Analysis('</s>', vocabularies)]}
     return word_analyses, vocabularies

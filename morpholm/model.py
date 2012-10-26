@@ -120,18 +120,18 @@ class MorphoProcess:
         return 'MorphoProcess(#words={N} | stem ~ {self.stem_model}, morphemes ~ {self.morpheme_model})'.format(self=self, N=sum(map(len, self.assignments.itervalues())))
 
 
-theta_doc = 1.0
-d_doc = 0.1
-theta_topic = 1.0
-d_topic = 0.8
+# Document-topic
+theta_doc, d_doc = 1.0, 0.1
+# Topic-word
+theta_topic, d_topic = 1.0, 0.8
 
-class TopicModel:
-    def __init__(self, n_topics, n_docs, doc_base, topic_base):
+class BaseTopicModel(object):
+    def __init__(self, n_docs, n_topics, make_document, make_topic, ll_document, ll_topic):
         self.n_topics = n_topics
-        self.doc_base = doc_base
-        self.topic_base = topic_base
-        self.document_topic = [PYP(theta_doc, d_doc, doc_base) for _ in xrange(n_docs)]
-        self.topic_word = [PYP(theta_topic, d_topic, topic_base)  for _ in xrange(n_topics)]
+        self.document_topic = [make_document() for _ in xrange(n_docs)]
+        self.topic_word = [make_topic()  for _ in xrange(n_topics)]
+        self.ll_topic = ll_topic
+        self.ll_document = ll_document
         self.assignments = defaultdict(list)
 
     def increment(self, doc, word):
@@ -152,10 +152,22 @@ class TopicModel:
         return sum(self.topic_prob(doc, word, k) for k in xrange(self.n_topics))
 
     def log_likelihood(self):
-        return (sum(dt.log_likelihood(base=False) for dt in self.document_topic)
-                + self.doc_base.log_likelihood()
-                + sum(tw.log_likelihood(base=False) for tw in self.topic_word)
-                + self.topic_base.log_likelihood())
+        return self.ll_document(self.document_topic) + self.ll_topic(self.topic_word)
+
+    def __repr__(self):
+        return 'TopicModel(#topics={self.n_topics})'.format(self=self)
+
+class TopicModel(BaseTopicModel):
+    def __init__(self, n_docs, n_topics, doc_base, topic_base):
+        self.doc_base = doc_base
+        self.topic_base = topic_base
+        make_topic = lambda: PYP(theta_topic, d_topic, topic_base)
+        make_document = lambda: PYP(theta_doc, d_doc, doc_base)
+        ll_document = lambda dts: (sum(dt.log_likelihood(base=False) for dt in dts)
+                + doc_base.log_likelihood())
+        ll_topic = lambda tws: (sum(tw.log_likelihood(base=False) for tw in tws)
+                + topic_base.log_likelihood())
+        super(TopicModel, self).__init__(n_docs, n_topics, make_document, make_topic, ll_document, ll_topic)
 
     def __repr__(self):
         return ('TopicModel(#topics={self.n_topics}; '

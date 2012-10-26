@@ -4,7 +4,17 @@ import math
 import cPickle
 from corpus import Vocabulary, encode_corpus
 from prob import CharLM, Uniform
-from model import TopicModel
+from pyp import PYP
+from model import TopicModel, BaseTopicModel, BigramPattern, MorphoProcess
+
+# Document-topic
+theta_doc, d_doc = 1.0, 0.1
+# Stem PYP
+alpha, p = 1.0, 0.8
+# Pattern PYP
+nu, q = 1.0, 0.8
+# Morpheme prior
+beta = 1.0
 
 def run_sampler(model, corpus, n_iter):
     for it in xrange(n_iter):
@@ -31,29 +41,62 @@ def main():
 
     logging.info('Training model with %d topics', args.topics)
 
-    vocabulary = Vocabulary()
+    if args.train.endswith('.pickle'):
+        logging.info('Reading training corpus')
+        with open(args.train) as f:
+            data = cPickle.load(f)
+        vocabularies = data['vocabularies']
+        word_analyses = data['analyses']
+        training_corpus = data['corpus']
 
-    logging.info('Reading training corpus')
-    with open(args.train) as train:
-        training_corpus = encode_corpus(train, vocabulary)
+        logging.info('Pre-loading stem CharLM')
+        char_lm = CharLM(args.charlm, vocabularies['stem'])
 
-    logging.info('Corpus size: %d sentences | %d words | Voc size: %d words',
-            len(training_corpus.sentences), len(training_corpus), len(vocabulary))
+        doc_base = Uniform(args.topics)
+        make_document = lambda: PYP(theta_doc, d_doc, doc_base)
+        ll_document = lambda dts: (sum(dt.log_likelihood(base=False) for dt in dts) 
+                + doc_base.log_likelihood())
 
-    logging.info('Training model')
-    doc_base = Uniform(args.topics)
-    if args.charlm:
-        topic_base = CharLM(args.charlm, vocabulary)
+        pattern_model = PYP(nu, q, BigramPattern(len(vocabularies['morpheme']), beta, vocabularies['pattern']))
+        stem_base = PYP(alpha, p, char_lm)
+        make_topic = lambda: MorphoProcess(PYP(alpha, p, stem_base), pattern_model, word_analyses)
+        ll_topic = lambda tws: (sum(tw.stem_model.log_likelihood(base=False) for tw in tws) 
+                + stem_base.log_likelihood() + pattern_model.log_likelihood())
+
+        model = BaseTopicModel(len(training_corpus.sentences), args.topics, make_document, make_topic, ll_document, ll_topic)
+
+        logging.info('Training model')
+        run_sampler(model, training_corpus, args.iterations)
+
+        if args.output:
+            logging.info('Saving model')
+            data = {'vocabularies': vocabularies, 'analyses': word_analyses, 'model': model}
+            with open(args.output, 'w') as output:
+                cPickle.dump(data, output, protocol=cPickle.HIGHEST_PROTOCOL)
     else:
-        topic_base = Uniform(len(vocabulary))
-    model = TopicModel(args.topics, len(training_corpus.sentences), doc_base, topic_base) 
+        vocabulary = Vocabulary()
 
-    run_sampler(model, training_corpus, args.iterations)
+        logging.info('Reading training corpus')
+        with open(args.train) as train:
+            training_corpus = encode_corpus(train, vocabulary)
 
-    if args.output:
-        data = {'vocabulary': vocabulary, 'model': model}
-        with open(args.output, 'w') as f:
-            cPickle.dump(data, f, cPickle.HIGHEST_PROTOCOL)
+        logging.info('Corpus size: %d sentences | %d words | Voc size: %d words',
+                len(training_corpus.sentences), len(training_corpus), len(vocabulary))
+
+        logging.info('Training model')
+        doc_base = Uniform(args.topics)
+        if args.charlm:
+            topic_base = CharLM(args.charlm, vocabulary)
+        else:
+            topic_base = Uniform(len(vocabulary))
+        model = TopicModel(len(training_corpus.sentences), args.topics, doc_base, topic_base) 
+
+        run_sampler(model, training_corpus, args.iterations)
+
+        if args.output:
+            data = {'vocabulary': vocabulary, 'model': model}
+            with open(args.output, 'w') as f:
+                cPickle.dump(data, f, cPickle.HIGHEST_PROTOCOL)
 
 if __name__ == '__main__':
     main()
