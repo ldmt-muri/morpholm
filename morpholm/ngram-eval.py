@@ -35,8 +35,8 @@ def main():
         logging.info('Using model: %s', model)
 
         logging.info('Analyzing test corpus')
-        fsm = Analyzer(args.fst)
-        test_corpus = analyze_corpus(sys.stdin, fsm, vocabularies, word_analyses)
+        analyzer = Analyzer(args.fst, args.backend, not args.notrust)
+        test_corpus = analyze_corpus(sys.stdin, analyzer, vocabularies, word_analyses)
 
         logging.info('Computing test corpus perplexity')
         print_ppl(model, test_corpus)
