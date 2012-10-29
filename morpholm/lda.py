@@ -75,7 +75,7 @@ def main():
         def write_output(it):
             logging.info('Saving model')
             data = {'vocabularies': vocabularies, 'analyses': word_analyses, 'model': model}
-            with open('{0}.{1}.pickle'.format(args.output, it), 'w') as output:
+            with open('{0}.{1}.pickle'.format(args.output, it+1), 'w') as output:
                 cPickle.dump(data, output, protocol=cPickle.HIGHEST_PROTOCOL)
 
         logging.info('Training model')

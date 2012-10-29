@@ -31,7 +31,7 @@ def main():
     parser.add_argument('--train', help='training corpus', required=True)
     parser.add_argument('--charlm', help='character language model (KenLM format)',
                         required=True)
-    parser.add_argument('--model', help='type of model to train (1/2/3)', type=int, default=2)
+    parser.add_argument('--model', help='type of model to train (1/2/3)', type=int, default=3)
     parser.add_argument('--output', '-o', help='model output path')
     args = parser.parse_args()
 
