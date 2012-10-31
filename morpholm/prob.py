@@ -83,12 +83,12 @@ class DirichletMultinomial:
     def prob(self, k):
         # = self.weight(k) * self.gamma_factor(1)
         assert k >= 0
-        if k > self.K: return 0
+        if k >= self.K: return 0
         return (self.alpha + self.count[k])/(self.K * self.alpha + self.N)
 
     def weight(self, k):
         assert k >= 0
-        if k > self.K: return 0
+        if k >= self.K: return 0
         return (self.alpha + self.count[k])
 
     def gamma_factor(self, n):
@@ -154,7 +154,7 @@ class Uniform:
         self.count -= 1
 
     def prob(self, k):
-        if k > self.N: return 0
+        if k >= self.N: return 0
         return 1/self.N
 
     def log_likelihood(self):
