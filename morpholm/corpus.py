@@ -43,15 +43,11 @@ def encode_corpus(stream, vocabulary):
 START = 0
 STOP = 1
 def ngrams(sentence, order):
-    if order == 1:
-        for w in sentence:
-            yield (w,)
-    else:
-        ngram = deque(maxlen=order)
-        for w in chain(repeat(START, order-1), sentence, (STOP,)):
-            ngram.append(w)
-            if len(ngram) == order:
-                yield tuple(ngram)
+    ngram = deque(maxlen=order)
+    for w in chain(repeat(START, order-1), sentence, (STOP,)):
+        ngram.append(w)
+        if len(ngram) == order:
+            yield tuple(ngram)
 
 def hmm_trigrams(sentence):
     trigram = deque(maxlen=3)

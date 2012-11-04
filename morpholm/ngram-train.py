@@ -18,7 +18,7 @@ def run_sampler(model, corpus, n_iter):
                 if it > 0: model.decrement(seq)
                 model.increment(seq)
         ll = model.log_likelihood()
-        ppl = math.exp(-ll / len(corpus))
+        ppl = math.exp(-ll / (len(corpus) + len(corpus.sentences)))
         logging.info('LL=%.0f ppl=%.3f', ll, ppl)
         logging.info('Model: %s', model)
 

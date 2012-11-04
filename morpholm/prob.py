@@ -155,7 +155,7 @@ class Uniform:
 
     def prob(self, k):
         if k >= self.N: return 0
-        return 1/self.N
+        return 1./self.N
 
     def log_likelihood(self):
         return - self.count * math.log(self.N)

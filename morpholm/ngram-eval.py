@@ -29,7 +29,7 @@ def decode_corpus(model, corpus, vocabularies):
 
 def get_match_level(model, seq, vocabularies, analyses=None):
     if isinstance(model, PYPLM):
-        m = model.models.get(seq[:-1], None)
+        m = model.models.get(hash(seq[:-1]), None)
         if m and seq[-1] in m.tables:
             return '| '+' '.join(vocabularies['word'][w] for w in seq[:-1])+' ('+str(model.order)+'-gram)'
         elif isinstance(model.backoff, MorphoProcess):
