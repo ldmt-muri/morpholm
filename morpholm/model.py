@@ -125,23 +125,17 @@ theta_doc, d_doc = 1.0, 0.1
 # Topic-word
 theta_topic, d_topic = 1.0, 0.8
 
-class BaseTopicModel(object):
-    def __init__(self, n_docs, n_topics, make_document, make_topic, ll_document, ll_topic):
+class TopicModel(object):
+    def __init__(self, n_topics):
         self.n_topics = n_topics
-        self.document_topic = [make_document() for _ in xrange(n_docs)]
-        self.topic_word = [make_topic()  for _ in xrange(n_topics)]
-        self.ll_topic = ll_topic
-        self.ll_document = ll_document
-        self.assignments = defaultdict(list)
 
     def increment(self, doc, word):
         z = mult_sample((k, self.topic_prob(doc, word, k)) for k in xrange(self.n_topics))
-        self.assignments[doc, word].append(z)
         self.document_topic[doc].increment(z)
         self.topic_word[z].increment(word)
+        return z
 
-    def decrement(self, doc, word):
-        z = remove_random(self.assignments[doc, word])
+    def decrement(self, doc, word, z):
         self.document_topic[doc].decrement(z)
         self.topic_word[z].decrement(word)
 
@@ -151,23 +145,22 @@ class BaseTopicModel(object):
     def prob(self, doc, word):
         return sum(self.topic_prob(doc, word, k) for k in xrange(self.n_topics))
 
-    def log_likelihood(self):
-        return self.ll_document(self.document_topic) + self.ll_topic(self.topic_word)
-
     def __repr__(self):
         return 'TopicModel(#topics={self.n_topics})'.format(self=self)
 
-class TopicModel(BaseTopicModel):
+class PYPTopicModel(TopicModel):
     def __init__(self, n_docs, n_topics, doc_base, topic_base):
+        super(PYPTopicModel, self).__init__(n_topics)
         self.doc_base = doc_base
         self.topic_base = topic_base
-        make_topic = lambda: PYP(theta_topic, d_topic, topic_base)
-        make_document = lambda: PYP(theta_doc, d_doc, doc_base)
-        ll_document = lambda dts: (sum(dt.log_likelihood(base=False) for dt in dts)
-                + doc_base.log_likelihood())
-        ll_topic = lambda tws: (sum(tw.log_likelihood(base=False) for tw in tws)
-                + topic_base.log_likelihood())
-        super(TopicModel, self).__init__(n_docs, n_topics, make_document, make_topic, ll_document, ll_topic)
+        self.document_topic = [PYP(theta_doc, d_doc, doc_base) for _ in xrange(n_docs)]
+        self.topic_word = [PYP(theta_topic, d_topic, topic_base) for _ in xrange(n_topics)]
+
+    def log_likelihood(self):
+        return (sum(dt.log_likelihood(base=False) for dt in self.document_topic)
+                + self.doc_base.log_likelihood()
+                + sum(tw.log_likelihood(base=False) for tw in self.topic_word)
+                + self.topic_base.log_likelihood())
 
     def __repr__(self):
         return ('TopicModel(#topics={self.n_topics}; '
@@ -175,3 +168,30 @@ class TopicModel(BaseTopicModel):
                 'phi ~ PYP(d={d_topic}, theta={theta_topic}, base={self.topic_base})'
                 ')').format(self=self, d_doc=d_doc, theta_doc=theta_doc, 
                         d_topic=d_topic, theta_topic=theta_topic)
+
+# Stem PYP
+alpha, p = 1.0, 0.8
+
+class MorphoTopicModel(TopicModel):
+    def __init__(self, n_docs, n_topics, doc_base, stem_base, pattern_model, word_analyses):
+        super(MorphoTopicModel, self).__init__(n_topics)
+        self.doc_base = doc_base
+        self.stem_base = stem_base
+        self.pattern_model = pattern_model
+        self.document_topic = [PYP(theta_doc, d_doc, doc_base) for _ in xrange(n_docs)]
+        self.topic_word = [PYP(theta_topic, d_topic, MorphoProcess(PYP(alpha, p, stem_base), pattern_model, word_analyses)) for _ in xrange(n_topics)]
+
+    def log_likelihood(self):
+        return (sum(dt.log_likelihood(base=False) for dt in self.document_topic) 
+                + self.doc_base.log_likelihood()
+                + sum(tw.log_likelihood(base=False)
+                    + tw.base.stem_model.log_likelihood(base=False) for tw in self.topic_word)
+                + self.stem_base.log_likelihood() + self.pattern_model.log_likelihood())
+
+    def __repr__(self):
+        return ('TopicModel(#topics={self.n_topics}; '
+                'theta ~ PYP(d={d_doc}, theta={theta_doc}, base={self.doc_base}); '
+                'phi ~ PYP(d={d_topic}, theta={theta_topic}, '
+                'base=MP(stem|topic ~ PYP(d={p}, theta={alpha}, base={self.stem_base}), pattern ~ {self.pattern_model}))'
+                ')').format(self=self, d_doc=d_doc, theta_doc=theta_doc, 
+                        d_topic=d_topic, theta_topic=theta_topic, alpha=alpha, p=p)

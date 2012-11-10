@@ -5,24 +5,22 @@ import cPickle
 from corpus import Vocabulary, encode_corpus
 from prob import CharLM, Uniform
 from pyp import PYP
-from model import TopicModel, BaseTopicModel, MorphoProcess
+from model import PYPTopicModel, MorphoTopicModel, BigramPattern, PoissonUnigramPattern
 
-# Document-topic
-theta_doc, d_doc = 1.0, 0.1
-# Topic-word
-theta_topic, d_topic = 1.0, 0.8
-# Stem PYP
-alpha, p = 1.0, 0.8
 # Pattern PYP
 nu, q = 1.0, 0.8
+# CharLM PYP
+alpha, p = 1.0, 0.8
 
 def run_sampler(model, corpus, n_iter, callback=None):
+    assignments = [[None]*len(doc) for doc in corpus.sentences]
     for it in xrange(n_iter):
         logging.info('Iteration %d/%d', it+1, n_iter)
         for d, sentence in enumerate(corpus.sentences):
-            for word in sentence:
-                if it > 0: model.decrement(d, word)
-                model.increment(d, word)
+            doc_assignments = assignments[d]
+            for i, word in enumerate(sentence):
+                if it > 0: model.decrement(d, word, doc_assignments[i])
+                doc_assignments[i] = model.increment(d, word)
         if it % 10 == 0:
             ll = model.log_likelihood()
             ppl = math.exp(-ll / len(corpus))
@@ -40,6 +38,7 @@ def main():
     parser.add_argument('--train', help='training corpus', required=True)
     parser.add_argument('--output', help='output prefix', required=True)
     parser.add_argument('--charlm', help='character language model (KenLM format)')
+    parser.add_argument('--model', help='pattern model', type=int, default=0)
     args = parser.parse_args()
 
     logging.info('Training model with %d topics', args.topics)
@@ -56,21 +55,20 @@ def main():
         char_lm = CharLM(args.charlm, vocabularies['stem'])
 
         doc_base = Uniform(args.topics)
-        make_document = lambda: PYP(theta_doc, d_doc, doc_base)
-        ll_document = lambda dts: (sum(dt.log_likelihood(base=False) for dt in dts) 
-                + doc_base.log_likelihood())
 
-        pattern_model = PYP(nu, q, Uniform(len(vocabularies['pattern'])))
-        stem_base = PYP(alpha, p, char_lm)
-        # PYP-MP0
-        make_topic = lambda: PYP(theta_topic, d_topic, 
-                MorphoProcess(PYP(alpha, p, stem_base), pattern_model, word_analyses))
-        ll_topic = lambda tws: (sum(tw.log_likelihood(base=False)
-            + tw.base.stem_model.log_likelihood(base=False) for tw in tws)
-            + stem_base.log_likelihood() + pattern_model.log_likelihood())
+        logging.info('Using pattern model %d', args.model)
+        n_morphemes = len(vocabularies['morpheme'])
+        pvoc = vocabularies['pattern']
+        if args.model == 0:
+            pattern_base = Uniform(len(pvoc))
+        if args.model == 1:
+            pattern_base = PoissonUnigramPattern(n_morphemes, 1.0, 1.0, 1.0, pvoc)
+        elif args.model == 2:
+            pattern_base = BigramPattern(n_morphemes, 1.0, pvoc)
+        pattern_model = PYP(nu, q, pattern_base)
 
-        model = BaseTopicModel(len(training_corpus.sentences), args.topics,
-                make_document, make_topic, ll_document, ll_topic)
+        model = MorphoTopicModel(len(training_corpus.sentences), args.topics,
+                doc_base, char_lm, pattern_model, word_analyses)
 
         def write_output(it):
             logging.info('Saving model')
@@ -90,14 +88,16 @@ def main():
         logging.info('Corpus size: %d sentences | %d words | Voc size: %d words',
                 len(training_corpus.sentences), len(training_corpus), len(vocabulary))
 
-        logging.info('Training model')
         doc_base = Uniform(args.topics)
         if args.charlm:
-            topic_base = CharLM(args.charlm, vocabulary)
+            logging.info('Pre-loading word CharLM')
+            char_lm = CharLM(args.charlm, vocabulary)
+            topic_base = PYP(alpha, p, char_lm)
         else:
             topic_base = Uniform(len(vocabulary))
-        model = TopicModel(len(training_corpus.sentences), args.topics, doc_base, topic_base) 
+        model = PYPTopicModel(len(training_corpus.sentences), args.topics, doc_base, topic_base)
 
+        logging.info('Training model')
         run_sampler(model, training_corpus, args.iterations)
 
         if args.output:
