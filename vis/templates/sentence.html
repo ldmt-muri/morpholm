@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf8"/>
+    <title></title>
+    <link rel="stylesheet" href="{{url_for('static', filename='style.css')}}"/>
+    <style>
+        {% for morpheme, color in palette.items() %}
+        span.m-{{morpheme|morph_norm}} {color: rgb({{(color[0]*255)|int}},{{(color[1]*255)|int}},{{(color[2]*255)|int}})}
+        {% endfor %}
+        span.m-stem {color: #555;}
+    </style>
+</head>
+<body>
+<ul>
+    {% for word, total_score, known, stem_group in words %}
+    <li class="word">
+        <span class="word">
+            <span class="score">{{total_score|int}}</span>
+            <span class="{{known and 'voc' or 'oov'}}">{{known and '(Voc)' or '(OOV)'}}</span>
+            <span>{{word}}</span>
+        </span>
+    <ul class="analyses">
+        {% for stem_prob, stem, known, patterns in stem_group %}
+        <li>
+            <span class="stem">
+                <span>{{stem}}</span>
+                <span class="{{known and 'voc' or 'oov'}}">{{known and '(Voc)' or '(OOV)'}}</span>
+                <span class="score">{{stem_prob|int}}</span>
+            </span>
+            <ul class="pattern">
+            {% for stem_prob, pattern_prob, analysis_prob, pattern in patterns %}
+            <li class="pattern">
+                <span class="score" title="(stem) {{stem_prob|round(2)}} (pattern) {{pattern_prob|round(2)}}">{{analysis_prob|int}}</span>
+                {% for morpheme in pattern %}
+                <span class="m-{{morpheme|morph_norm}}">+{{morpheme}}</span>
+                {% endfor %}
+            </li>
+            {% endfor %}
+        </ul>
+        </li>
+        {% endfor %}
+    </ul>
+    </li>
+    {% endfor %}
+</ul>
+</span>
+</p>
+</body>
+</html>
+
