@@ -34,16 +34,23 @@ class Analysis(object):
         self.stem = stem
         self.pattern = pattern
 
+    def __eq__(self, other):
+        return (isinstance(other, Analysis) and 
+                (self.stem, self.pattern) == (other.stem, other.pattern))
+
+    def __hash__(self):
+        return hash((self.stem, self.pattern))
+
 class Analyzer(object):
     def analyze_corpus(self, corpus, add_null=False):
-        if not hasattr(corpus, 'analyses'):
+        if not hasattr(corpus, 'analyses'): # Pre-analyzed corpus
             corpus.analyses = {}
             corpus.stem_vocabulary = Vocabulary()
             corpus.morpheme_vocabulary = Vocabulary()
             corpus.pattern_vocabulary = Vocabulary()
         null_pattern = corpus.pattern_vocabulary[(corpus.morpheme_vocabulary[STEM],)]
         for w, word in enumerate(corpus.vocabulary):
-            if w in corpus.analyses: continue
+            if w in corpus.analyses: continue # Skip already analyzed words
             analyses = []
             if word_re.match(word):
                 for analysis in self.analyze_word(word):
@@ -62,4 +69,4 @@ class Analyzer(object):
                     analyses.append(Analysis(s, p))
             if not analyses or add_null:
                 analyses.append(Analysis(corpus.stem_vocabulary[word], null_pattern))
-            corpus.analyses[w] = analyses
+            corpus.analyses[w] = tuple(set(analyses))

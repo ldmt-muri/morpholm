@@ -59,6 +59,7 @@ def main():
         with open(args.output, 'w') as f:
             model.source_vocabulary = source_corpus.vocabulary
             model.target_vocabulary = target_corpus.vocabulary
+            model.stem_vocabulary = target_corpus.stem_vocabulary
             model.morpheme_vocabulary = target_corpus.morpheme_vocabulary
             model.pattern_vocabulary = target_corpus.pattern_vocabulary
             model.analyses = target_corpus.analyses

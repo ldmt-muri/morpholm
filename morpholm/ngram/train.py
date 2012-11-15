@@ -46,6 +46,7 @@ def main():
 
     if args.output:
         model.vocabulary = training_corpus.vocabulary
+        model.stem_vocabulary = training_corpus.stem_vocabulary
         model.morpheme_vocabulary = training_corpus.morpheme_vocabulary
         model.pattern_vocabulary = training_corpus.pattern_vocabulary
         model.analyses = training_corpus.analyses

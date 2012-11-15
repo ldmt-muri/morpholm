@@ -1,57 +1,83 @@
+"""
+# Turkish
 dev_text = '/home/vchahune/data/ldmt/lm-exp/tur/corpus/dev.txt'
 model_pickle = '/home/vchahune/data/ldmt/lm-exp/tur/models/unigram-mp.1000.pickle'
-fst = '/home/vchahune/data/ldmt/analyzers/tur/rev-generator.fst'
 backend = 'xfst'
+analyzer = '/home/vchahune/data/ldmt/analyzers/tur/rev-generator.fst'
+add_null = False
+"""
+
+# Kinyarwanda
+dev_text = '/home/vchahune/data/ldmt/lm-exp/kin-bbc/2012-11-13/corpus/dev.txt'
+model_pickle = '/home/vchahune/data/ldmt/lm-exp/kin-bbc/2012-11-13/models/unigram-mp2.1000.pickle'
+backend = 'foma'
+analyzer = '/home/vchahune/data/ldmt/analyzers/kin/2012-11-13.fst'
+add_null = False
+annotation_database = '/home/vchahune/data/ldmt/annotation/kin/test.db'
 
 """
-dev_text = '/home/vchahune/data/ldmt/lm-exp/kin-small/corpus/dev.txt'
-model_pickle = '/home/vchahune/data/ldmt/lm-exp/kin-small/models/unigram-mp.1000.pickle'
-fst = '/home/vchahune/data/ldmt/analyzers/kin/2012-10-24.fst'
+# Russian
+dev_text = '/home/vchahune/data/ldmt/lm-exp/rus/corpus/dev.txt'
+model_pickle = '/home/vchahune/data/ldmt/lm-exp/rus/models_guesser/unigram-mp2.1000.pickle'
 backend = 'foma'
+analyzer = '/home/vchahune/data/ldmt/analyzers/rus/rusmorph.fst'
+add_null = True
+annotation_database = '/home/vchahune/data/ldmt/annotation/rus/test.db'
 """
+
+users = {'chahuneau': 'victor',
+         'dyer': 'chris',
+         'smith': 'noah',
+         'baldridge': 'jason',
+         'mielens': 'jason',
+         'jerro': 'kyle'}
+
+n_sentences = 100
 
 # Load training sentences
 with open(dev_text) as dev:
-    sentences = [s.decode('utf8') for s in dev]
+    sentences = [s.decode('utf8') for s in dev][:n_sentences]
 
-# Load MorphoLM
-import sys
-sys.path.append('../morpholm')
+import logging
+logging.basicConfig(level=logging.INFO)
 
 # Load analyzer
-import analysis
-analyzer = analysis.Analyzer(fst, backend=backend)
+from morpholm.analyzers import all_analyzers
+from morpholm.analyzers.analyzer import parse_analysis, Analysis
+analyzer = all_analyzers[backend](analyzer)
+logging.info('Using %s for analysis', analyzer)
 
 # Load model
 import cPickle
 with open(model_pickle) as m:
-    data = cPickle.load(m)
-model = data['model']
-morpho_process = model.base
-vocabularies = data['vocabularies']
-word_analyses = data['analyses']
+    model = cPickle.load(m)
+morpho_process = model.backoff
 
-import logging
+# XXX
+from morpholm.ngram.eval import fix_model
+fix_model(model)
+# XXX
+
+# __STEM__ -> stem
+S = model.morpheme_vocabulary['__STEM__']
+model.morpheme_vocabulary.id2word[S] = 'stem'
+
+from vpyp.corpus import Corpus
 
 def analyze_sentence(sentence):
-    for word in sentence.split():
-        w = vocabularies['word'][word]
-        try:
-            if not w in word_analyses:
-                analyses = analyzer.get_analyses(word)
-                yield [analysis.Analysis(ana, vocabularies) for ana in analyses]
-            else:
-                yield word_analyses[w]
-        except analysis.AnalysisError as ana:
-            logging.error(u'Analysis error for {0}: {1}'.format(word, ana))
-            yield [analysis.Analysis(word, vocabularies)]
+    corpus = Corpus([sentence.encode('utf8')], model.vocabulary)
+    corpus.stem_vocabulary = model.stem_vocabulary
+    corpus.morpheme_vocabulary = model.morpheme_vocabulary
+    corpus.pattern_vocabulary = model.pattern_vocabulary
+    corpus.analyses = model.analyses
+    analyzer.analyze_corpus(corpus, add_null)
+    return corpus.segments[0]
 
 # Color palette
 import colorsys
-import random
-n_colors = float(len(vocabularies['morpheme']))
+n_colors = float(len(model.morpheme_vocabulary))
 morpheme_colors = dict((morpheme, colorsys.hsv_to_rgb(i/n_colors, 0.8, 0.8)) 
-        for (i, morpheme) in enumerate(sorted(vocabularies['morpheme'].id2word,
+        for (i, morpheme) in enumerate(sorted(model.morpheme_vocabulary.id2word,
             key=lambda w: hash(w))))
 
 

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf8"/>
+    <title>Morphological analysis</title>
+    <link rel="stylesheet" href="{{url_for('static', filename='style.css')}}"/>
+</head>
+<body>
+<div id="main">
+<p>
+Logged in as {{name|title}}. Annotations: {{total_count}}/{{max_count}} words.
+</p>
+<ul>
+    {% for done, sentence in sentences %}
+    <li{% if done == 1 %} class="done"{% endif %}>+ <a href="{{url_for('sentence')}}?id={{loop.index0}}">{{sentence}}</a> ({{(100*done)|round|int}} %)</li>
+    {% endfor %}
+</ul>
+</div>
+</body>
+</html>
+

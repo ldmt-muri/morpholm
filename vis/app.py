@@ -1,5 +1,4 @@
-import sys
-from itertools import izip, groupby
+from itertools import groupby
 import math
 from flask import Flask, render_template, request
 import config
@@ -19,30 +18,28 @@ astem = lambda a: a.stem
 def decode_pattern(analysis):
     a_prob = math.log(config.morpho_process.analysis_prob(analysis))
     s_prob = math.log(config.morpho_process.stem_model.prob(analysis.stem))
-    p_prob = math.log(config.morpho_process.morpheme_model.prob(analysis.pattern))
+    p_prob = math.log(config.morpho_process.pattern_model.prob(analysis.pattern))
     return (s_prob, p_prob, a_prob,
-            [config.vocabularies['morpheme'][m] for m in 
-                config.vocabularies['pattern'][analysis.pattern]])
+            [config.model.morpheme_vocabulary[m] for m in 
+                config.model.pattern_vocabulary[analysis.pattern]])
 
-def word_score(word, analyses):
-    w = config.vocabularies['word'][word]
-    config.morpho_process.analyses[w] = analyses
-    score = math.log(config.model.prob(w))
-    del config.morpho_process.analyses[w]
+def word_score(word):
+    score = math.log(config.model.prob((), word))
     return score
 
 def is_known_stem(stem):
     return stem in config.morpho_process.stem_model.tables
 
 def is_known_word(word):
-    return config.vocabularies['word'][word] in config.model.tables
+    return word in config.model[()].tables
 
 def stem_score(anas):
     return math.log(sum(map(config.morpho_process.analysis_prob, anas)))
 
-def get_patterns(analyses):
+def get_patterns(word):
+    analyses = config.model.analyses[word]
     return sorted([(stem_score(anas),
-                    config.vocabularies['stem'][stem], is_known_stem(stem),
+                    config.model.stem_vocabulary[stem], is_known_stem(stem),
                     sorted(map(decode_pattern, anas), reverse=True))
                    for stem, anas in ((stem, list(anas_group))
                        for stem, anas_group in groupby(sorted(analyses, key=astem), key=astem))],
@@ -51,9 +48,10 @@ def get_patterns(analyses):
 @app.route('/sentence')
 def sentence():
     s = request.args.get('q')
-    words = [(word, word_score(word, analyses), is_known_word(word), get_patterns(analyses))
-             for word, analyses in izip(s.split(), config.analyze_sentence(s))]
+    words = [(config.model.vocabulary[word], word_score(word), 
+        is_known_word(word), get_patterns(word))
+             for word in config.analyze_sentence(s)]
     return render_template('sentence.html', words=words, palette=config.morpheme_colors)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=34954) #, debug=True)
+    app.run(host='0.0.0.0', port=34959)

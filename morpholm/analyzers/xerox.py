@@ -37,8 +37,11 @@ class XeroxAnalyzer(Analyzer):
 
     def analyze_corpus(self, corpus, add_null=False):
         self.analyses = {}
-        # Get analyses for all words in the vocabulary
-        analyzable = sorted(word for word in corpus.vocabulary if word_re.match(word))
+        # Get analyses for all words in the vocabulary not already analyzed
+        exclude = ({} if not hasattr(corpus, 'analyses') 
+                else set(corpus.vocabulary[w] for w in corpus.analyses))
+        analyzable = sorted(word for word in corpus.vocabulary 
+                if word_re.match(word) and word not in exclude)
         logging.info('Retrieving analyses for %d words', len(analyzable))
         for block in get_blocks(iter(analyzable), 1000):
             words = ' '.join(block)

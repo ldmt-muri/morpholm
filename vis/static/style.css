@@ -1,5 +1,5 @@
 body {
-    font: 10pt Monaco;
+    font: 10pt Monaco, Consolas, monospace;
     margin: 0;
 }
 
@@ -39,11 +39,11 @@ span.score {
 }
 
 span.oov {
-    color: #c42;
+    color: #942;
 }
 
 span.voc {
-    color: #4c2;
+    color: #492;
 }
 
 ul.analyses {
@@ -65,4 +65,29 @@ ul.pattern {
 #main li {
     line-height: 1.5em;
     margin-bottom: 0.5em;
+}
+
+input[type=text] {
+    border: 1px solid #ccc;
+}
+
+li.done {
+    background: #eee;
+}
+
+li.error {
+    background: #eaa;
+}
+
+a.nav {
+    font-size: 200%;
+    position: absolute;
+    right: 20px;
+}
+
+a#top {
+    font-size: 200%;
+    position: absolute;
+    left: 0
+    top: 0
 }

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf8"/>
+    <title></title>
+    <script src="{{url_for('static', filename='jquery-1.8.2.min.js')}}"></script>
+    <script>
+        var app_url = "{{url_for('annotate')}}";
+        var sentence_id = {{sentence_id}};
+    </script>
+    <script src="{{url_for('static', filename='annotation.js')}}"></script>
+    <link rel="stylesheet" href="{{url_for('static', filename='style.css')}}"/>
+    <style>
+        {% for morpheme, color in palette.items() %}
+        span.m-{{morpheme|morph_norm}} {color: rgb({{(color[0]*255)|int}},{{(color[1]*255)|int}},{{(color[2]*255)|int}})}
+        {% endfor %}
+        span.m-stem {color: #555;}
+    </style>
+</head>
+<body>
+{% if prev %}
+<a href="{{url_for('sentence')}}?id={{prev}}" class="nav">← Previous sentence</a>
+{% endif %}
+<a href="{{url_for('index')}}" id="top">⬆</a>
+<ul>
+    {% for word, stem_group, annotation, is_other in words %}
+    {% set word_id = loop.index0 %}
+    <li class="word{% if annotation %} done{% endif %}" id="word_{{word_id}}">
+        <span class="word">{{word}}</span>
+    <ul class="analyses">
+        {% for _, stem, patterns in stem_group %}
+        {% set stem_id = loop.index0 %}
+        <li>
+            <span class="stem">{{stem}}</span>
+            <ul class="pattern">
+            {% for pattern_prob, analysis, pattern in patterns %}
+            {% set pattern_id = loop.index0 %}
+            <li class="pattern">
+                <label for="morpheme_{{word_id}}_{{stem_id}}_{{pattern_id}}">
+                {% for morpheme in pattern %}
+                <span class="m-{{morpheme|morph_norm}}">+{{morpheme}}</span>
+                {% endfor %}
+            </label>
+            <input type="radio" id="morpheme_{{word_id}}_{{stem_id}}_{{pattern_id}}" name="morpheme_{{word_id}}" value="{{word_id}}|{{analysis|analysis_str}}"{% if analysis == annotation %} checked="checked"{% endif %}/>
+            </li>
+            {% endfor %}
+            </ul>
+        </li>
+        {% endfor %}
+        <li>
+            <input type="text" name="{{word_id}}" value="{% if is_other %}{{annotation|analysis_str}}{% else %}{{word}}{% endif %}"/>
+            <input type="radio" id="morpheme_{{word_id}}_other" name="morpheme_{{word_id}}" value="{{word_id}}|__other__"{% if is_other %} checked="checked"{% endif %}/>
+        </li>
+    </ul>
+    </li>
+    {% endfor %}
+</ul>
+{% if nxt %}
+<a href="{{url_for('sentence')}}?id={{nxt}}" class="nav">Next sentence ➝</a>
+{% endif %}
+</body>
+</html>
