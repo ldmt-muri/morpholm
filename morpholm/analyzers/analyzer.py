@@ -42,13 +42,14 @@ class Analysis(object):
         return hash((self.stem, self.pattern))
 
 class Analyzer(object):
-    def analyze_corpus(self, corpus, add_null=False):
+    def analyze_corpus(self, corpus, add_null=False, rm_null=False):
         if not hasattr(corpus, 'analyses'): # Pre-analyzed corpus
             corpus.analyses = {}
             corpus.stem_vocabulary = Vocabulary()
             corpus.morpheme_vocabulary = Vocabulary()
             corpus.pattern_vocabulary = Vocabulary()
-        null_pattern = corpus.pattern_vocabulary[(corpus.morpheme_vocabulary[STEM],)]
+        if not rm_null:
+            null_pattern = corpus.pattern_vocabulary[(corpus.morpheme_vocabulary[STEM],)]
         for w, word in enumerate(corpus.vocabulary):
             if w in corpus.analyses: continue # Skip already analyzed words
             analyses = []
@@ -59,14 +60,15 @@ class Analyzer(object):
                     except AnalysisError as e:
                         logging.error('Analysis error for %s: %s', word, e)
                         continue
-                    s = corpus.stem_vocabulary[stem]
                     try:
                         morphemes = tuple(corpus.morpheme_vocabulary[m] for m in pattern)
                     except OOV as e:
                         logging.error('Unknown morpheme "%s" in %s', e, analysis)
                         continue
+                    if rm_null and len(morphemes) < 2: continue
+                    s = corpus.stem_vocabulary[stem]
                     p = corpus.pattern_vocabulary[morphemes]
                     analyses.append(Analysis(s, p))
-            if not analyses or add_null:
+            if (not analyses or add_null) and not rm_null:
                 analyses.append(Analysis(corpus.stem_vocabulary[word], null_pattern))
             corpus.analyses[w] = tuple(set(analyses))

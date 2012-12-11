@@ -35,7 +35,7 @@ class XeroxAnalyzer(Analyzer):
             raise NotImplemented('No analyzer available for {0}'.format(language))
         self.language = supported_languages[language]
 
-    def analyze_corpus(self, corpus, add_null=False):
+    def analyze_corpus(self, corpus, add_null=False, rm_null=False):
         self.analyses = {}
         # Get analyses for all words in the vocabulary not already analyzed
         exclude = ({} if not hasattr(corpus, 'analyses') 
@@ -46,16 +46,23 @@ class XeroxAnalyzer(Analyzer):
         for block in get_blocks(iter(analyzable), 1000):
             words = ' '.join(block)
             logging.info('New request (%d words)', len(block))
-            response = requests.post(FORM_URL,
-                    data={'form_action_url': '/Services/fst-nlp-tools/Consume/176?id=57',
-                          'form_save_test_url': '/Services/fst-nlp-tools/SaveAsTest',
-                          'serviceId': '57',
-                          'formId': '176',
-                          'operationId': '316',
-                          'inputtext_TEXT': words.encode('utf8'),
-                          'inputtext_type': 'TEXT',
-                          'language': self.language,
-                          'ajax': 'true'})
+            try:
+                response = requests.post(FORM_URL,
+                        data={'form_action_url': '/Services/fst-nlp-tools/Consume/176?id=57',
+                              'form_save_test_url': '/Services/fst-nlp-tools/SaveAsTest',
+                              'serviceId': '57',
+                              'formId': '176',
+                              'operationId': '316',
+                              'inputtext_TEXT': words.encode('utf8'),
+                              'inputtext_type': 'TEXT',
+                              'language': self.language,
+                              'ajax': 'true'})
+            except Exception as e:
+                logging.error('Failed (%s)', e)
+                wait = random.random() * WAIT * 100
+                logging.info('Sleep during %.3f s', wait)
+                time.sleep(wait)
+                continue
             logging.info('Response status code: %d', response.status_code)
 
             result = json.loads(response.content)
@@ -73,7 +80,7 @@ class XeroxAnalyzer(Analyzer):
         logging.info('Retrieved %d analyses', len(self.analyses))
         if len(self.analyses) != len(analyzable):
             logging.warn('|analyses| != |analyzable|: some analyses might be missing')
-        super(XeroxAnalyzer, self).analyze_corpus(corpus, add_null)
+        super(XeroxAnalyzer, self).analyze_corpus(corpus, add_null, rm_null)
 
     def analyze_word(self, word):
         return self.analyses.get(word, (word, ))

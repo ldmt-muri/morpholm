@@ -18,6 +18,9 @@ class XFSTAnalyzer(Analyzer):
     def analyze_word(self, word):
         return set(self.fsm.apply_up(word))
 
+    def synthesize_word(self, analysis):
+        return set(self.fsm.apply_down(analysis))
+
     def __repr__(self):
         return 'XFSTAnalyzer'
 

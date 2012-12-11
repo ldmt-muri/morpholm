@@ -7,8 +7,7 @@ def main():
     logging.basicConfig(level=logging.INFO, format='%(message)s')
 
     parser = argparse.ArgumentParser(description='Print analyzed corpus')
-    parser.add_argument('--corpus', help='analyzed corpus', required=True)
-
+    parser.add_argument('corpus', help='analyzed corpus')
     args = parser.parse_args()
 
     with open(args.corpus) as f:
